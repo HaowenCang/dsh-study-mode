@@ -1,0 +1,31 @@
+{
+  "name": "A-baseline-todo",
+  "description": "A: real model tool_use for the built-in todo_write tool, then a text turn. Must render a real tool card in the real DSH Web UI.",
+  "repeatLast": false,
+  "titleResponse": { "text": "Tool card baseline" },
+  "responses": [
+    {
+      "id": "a1-tool",
+      "kind": "tool_use",
+      "text": "I will track this with the todo tool.",
+      "textChunkSize": 16,
+      "textChunkDelayMs": 30,
+      "toolName": "todo_write",
+      "toolInput": {
+        "todos": [
+          { "content": "Verify the real tool card renders", "status": "in_progress" },
+          { "content": "Capture screenshot evidence", "status": "pending" }
+        ]
+      },
+      "inputChunks": 3,
+      "inputChunkDelayMs": 250
+    },
+    {
+      "id": "a2-text",
+      "kind": "text",
+      "text": "The todo list is updated. That card above came from a real tool call executed by the real DSH agent loop.",
+      "textChunkSize": 18,
+      "textChunkDelayMs": 35
+    }
+  ]
+}

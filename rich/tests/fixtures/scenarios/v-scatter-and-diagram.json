@@ -1,0 +1,77 @@
+{
+  "name": "V-scatter-and-diagram",
+  "description": "Two real rich_render cards: a two-series scatter plot (with duplicate x) and a basic flow diagram.",
+  "repeatLast": false,
+  "titleResponse": { "text": "Chart variants" },
+  "responses": [
+    {
+      "id": "v1-scatter",
+      "kind": "tool_use",
+      "text": "Here is the scatter chart.",
+      "textChunkSize": 16,
+      "textChunkDelayMs": 15,
+      "toolName": "rich_render",
+      "toolInput": {
+        "content": {
+          "schemaVersion": 1,
+          "type": "scatter_plot",
+          "title": "Sample Scatter",
+          "subtitle": "two series, duplicate x",
+          "data": {
+            "series": [
+              { "name": "alpha", "points": [{ "x": 1, "y": 1 }, { "x": 1, "y": 2 }, { "x": 1, "y": 3 }, { "x": 2, "y": 1 }] },
+              { "name": "beta", "points": [{ "x": 2, "y": 2 }, { "x": 3, "y": 3 }, { "x": 3, "y": 1 }] }
+            ],
+            "xAxis": { "label": "time", "unit": "s" },
+            "yAxis": { "label": "value", "min": 0, "max": 4 }
+          }
+        }
+      },
+      "inputChunks": 3,
+      "inputChunkDelayMs": 60
+    },
+    {
+      "id": "v2-text",
+      "kind": "text",
+      "text": "Scatter rendered from a real tool result.",
+      "textChunkSize": 18,
+      "textChunkDelayMs": 15
+    },
+    {
+      "id": "v3-diagram",
+      "kind": "tool_use",
+      "text": "Here is the diagram.",
+      "textChunkSize": 16,
+      "textChunkDelayMs": 15,
+      "toolName": "rich_render",
+      "toolInput": {
+        "content": {
+          "schemaVersion": 1,
+          "type": "basic_diagram",
+          "title": "Derivative Flow",
+          "data": {
+            "nodes": [
+              { "id": "q", "label": "Question", "x": 100, "y": 200, "shape": "rounded" },
+              { "id": "hint", "label": "Hint requested", "x": 500, "y": 500, "shape": "diamond", "tone": "muted" },
+              { "id": "answer", "label": "Answer", "x": 900, "y": 200, "shape": "box", "tone": "accent" }
+            ],
+            "edges": [
+              { "from": "q", "to": "hint", "label": "needs help", "dashed": true },
+              { "from": "hint", "to": "answer" },
+              { "from": "q", "to": "answer", "label": "direct" }
+            ]
+          }
+        }
+      },
+      "inputChunks": 3,
+      "inputChunkDelayMs": 60
+    },
+    {
+      "id": "v4-text",
+      "kind": "text",
+      "text": "Diagram rendered from a real tool result.",
+      "textChunkSize": 18,
+      "textChunkDelayMs": 15
+    }
+  ]
+}

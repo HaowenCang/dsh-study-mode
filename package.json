@@ -1,0 +1,75 @@
+{
+  "name": "dsh-study-mode",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Study Mode for DeepSeek Harness: systematic teaching with Host-owned attempts, trusted grading and append-only learning evidence, plus validated rich visuals, physics demos and bounded Mermaid flowcharts.",
+  "license": "MIT",
+  "author": "HaowenCang",
+  "homepage": "https://github.com/HaowenCang/dsh-study-mode#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HaowenCang/dsh-study-mode.git"
+  },
+  "bugs": {
+    "url": "https://github.com/HaowenCang/dsh-study-mode/issues"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "study",
+    "teaching",
+    "physics",
+    "mermaid",
+    "visualization"
+  ],
+  "icon": "icon.svg",
+  "engines": {
+    "node": ">=24.13.0",
+    "dsh": ">=0.2.1-rc.3 <0.2.2"
+  },
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./agent": "./lib/agent.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "lib/index.js",
+    "lib/client.js",
+    "lib/agent.js",
+    "cordis.patch.yml",
+    "data/synthetic.json",
+    "skills",
+    "locale/*.json",
+    "icon.svg",
+    "README.md",
+    "README.zh.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "typecheck": "node scripts/typecheck.mjs",
+    "build": "node scripts/build.mjs",
+    "test": "node scripts/test.mjs",
+    "verify": "npm run typecheck && npm run build && npm test"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "@types/react": "18.3.31",
+    "@types/react-dom": "18.3.7",
+    "esbuild": "0.28.2",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "typescript": "5.9.3"
+  }
+}

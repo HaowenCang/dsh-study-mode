@@ -1,0 +1,9 @@
+node_modules/
+.tmp/
+rich/lib/
+rich/.tmp/
+*.log
+*.tgz
+*.db
+*.db-wal
+*.db-shm

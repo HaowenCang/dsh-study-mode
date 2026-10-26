@@ -1,0 +1,23 @@
+{
+  "name": "B2-unknown-tool",
+  "description": "B2: the model names a tool that does not exist in the catalog. Observed separately from schema-invalid arguments because the unknown-name failure happens in a different layer.",
+  "repeatLast": true,
+  "titleResponse": { "text": "Unknown tool" },
+  "responses": [
+    {
+      "id": "b2a-unknown-tool",
+      "kind": "tool_use",
+      "toolName": "no_such_tool_xyz",
+      "toolInput": { "x": 1 },
+      "inputChunks": 1,
+      "inputChunkDelayMs": 0
+    },
+    {
+      "id": "b2b-text",
+      "kind": "text",
+      "text": "The named tool does not exist in this session's catalog.",
+      "textChunkSize": 20,
+      "textChunkDelayMs": 20
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "name": "E-multi-cards",
+  "description": "E: two different real tool calls in ONE session across two user turns, then history replay after reload. Both cards must rebuild from persisted session data.",
+  "repeatLast": false,
+  "titleResponse": { "text": "Multiple tool cards" },
+  "responses": [
+    {
+      "id": "e1-todo",
+      "kind": "tool_use",
+      "toolName": "todo_write",
+      "toolInput": {
+        "todos": [
+          { "content": "First card: todo_write", "status": "in_progress" },
+          { "content": "Second card: pwsh", "status": "pending" }
+        ]
+      },
+      "inputChunks": 2,
+      "inputChunkDelayMs": 150
+    },
+    {
+      "id": "e2-text",
+      "kind": "text",
+      "text": "First card recorded. Send the second request when ready.",
+      "textChunkSize": 20,
+      "textChunkDelayMs": 20
+    },
+    {
+      "id": "e3-pwsh",
+      "kind": "tool_use",
+      "toolName": "pwsh",
+      "toolInput": {
+        "command": "Write-Output 'card-two-from-pwsh'",
+        "description": "Second tool card from the PowerShell tool"
+      },
+      "inputChunks": 2,
+      "inputChunkDelayMs": 150
+    },
+    {
+      "id": "e4-text",
+      "kind": "text",
+      "text": "Second card recorded. Both cards in this session came from real tool calls.",
+      "textChunkSize": 20,
+      "textChunkDelayMs": 20
+    }
+  ]
+}

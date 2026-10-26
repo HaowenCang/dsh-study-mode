@@ -1,0 +1,46 @@
+{
+  "name": "R-rich-render",
+  "description": "R: real tool_use for the plugin's rich_render tool with the Lead's exact sine line_plot payload. The Host half validates it and the Client half must render the rich card (data-dsh-rich contract).",
+  "repeatLast": false,
+  "titleResponse": { "text": "Rich card smoke" },
+  "responses": [
+    {
+      "id": "r1-rich-render",
+      "kind": "tool_use",
+      "toolName": "rich_render",
+      "toolInput": {
+        "content": {
+          "schemaVersion": 1,
+          "type": "line_plot",
+          "title": "Sine Function",
+          "subtitle": "y = sin(x)",
+          "data": {
+            "series": [
+              {
+                "name": "sin(x)",
+                "points": [
+                  { "x": 0, "y": 0 },
+                  { "x": 1.5707963268, "y": 1 },
+                  { "x": 3.1415926536, "y": 0 },
+                  { "x": 4.7123889804, "y": -1 },
+                  { "x": 6.2831853072, "y": 0 }
+                ]
+              }
+            ],
+            "xAxis": { "label": "x", "unit": "rad" },
+            "yAxis": { "label": "y", "min": -1.2, "max": 1.2 }
+          }
+        }
+      },
+      "inputChunks": 4,
+      "inputChunkDelayMs": 120
+    },
+    {
+      "id": "r2-text",
+      "kind": "text",
+      "text": "The sine plot above was rendered from a real rich_render tool result.",
+      "textChunkSize": 20,
+      "textChunkDelayMs": 20
+    }
+  ]
+}

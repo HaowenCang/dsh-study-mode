@@ -1,0 +1,26 @@
+{
+  "name": "C-phase-visibility",
+  "description": "C: slow partial input_json_delta streaming holds the client-side `preparing` phase for ~4s, then a genuinely slow tool execution (Start-Sleep 4000ms) holds the dispatched `start`/running phase for ~4s. Both in-progress states must be captured before the result settles.",
+  "repeatLast": false,
+  "titleResponse": { "text": "Phase visibility" },
+  "responses": [
+    {
+      "id": "c1-slow-tool",
+      "kind": "tool_use",
+      "toolName": "pwsh",
+      "toolInput": {
+        "command": "Start-Sleep -Milliseconds 4000; Write-Output 'mock-slow-tool-done'",
+        "description": "Hold the tool row in the running state for four seconds"
+      },
+      "inputChunks": 8,
+      "inputChunkDelayMs": 500
+    },
+    {
+      "id": "c2-text",
+      "kind": "text",
+      "text": "The slow command finished; the tool card settled.",
+      "textChunkSize": 18,
+      "textChunkDelayMs": 20
+    }
+  ]
+}

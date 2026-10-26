@@ -1,0 +1,18 @@
+﻿{
+    "name":  "D-interruption",
+    "description":  "D: one long slow text stream (~60s). The probe presses the UI stop control mid-stream and must observe an interrupted/aborted settled state.",
+    "repeatLast":  false,
+    "titleResponse":  {
+                          "text":  "Interruption"
+                      },
+    "responses":  [
+                      {
+                          "id":  "d1-slow-text",
+                          "kind":  "text",
+                          "text":  "This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. This is a deliberately slow streamed answer used to observe interruption. ",
+                          "textChunkSize":  10,
+                          "textChunkDelayMs":  250,
+                          "stopReason":  "end_turn"
+                      }
+                  ]
+}

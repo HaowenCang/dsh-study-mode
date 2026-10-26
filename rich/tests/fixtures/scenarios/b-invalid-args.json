@@ -1,0 +1,27 @@
+{
+  "name": "B-invalid-arguments",
+  "description": "B: a real tool call whose arguments violate the tool's schema (status is not one of the three allowed values). The tool layer must produce an error result, not a success card.",
+  "repeatLast": false,
+  "titleResponse": { "text": "Invalid tool args" },
+  "responses": [
+    {
+      "id": "b1-invalid-args",
+      "kind": "tool_use",
+      "toolName": "todo_write",
+      "toolInput": {
+        "todos": [
+          { "content": "This status is not valid", "status": "bogus_status" }
+        ]
+      },
+      "inputChunks": 2,
+      "inputChunkDelayMs": 100
+    },
+    {
+      "id": "b2-text",
+      "kind": "text",
+      "text": "The tool reported a failure; the error row above is the settled result.",
+      "textChunkSize": 18,
+      "textChunkDelayMs": 20
+    }
+  ]
+}

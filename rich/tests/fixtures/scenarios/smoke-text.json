@@ -1,0 +1,15 @@
+{
+  "name": "smoke-text",
+  "description": "Minimal plain-text reply. Used to discover the model/tool catalog and the composer DOM before scripting assertions.",
+  "repeatLast": true,
+  "titleResponse": { "text": "Smoke session" },
+  "responses": [
+    {
+      "id": "s1-text",
+      "kind": "text",
+      "text": "SMOKE_OK. This reply came from the local scenario-driven mock provider through the real DSH web runtime.",
+      "textChunkSize": 16,
+      "textChunkDelayMs": 15
+    }
+  ]
+}

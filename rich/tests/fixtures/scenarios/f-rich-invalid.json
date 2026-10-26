@@ -1,0 +1,37 @@
+{
+  "name": "F-rich-invalid",
+  "description": "The model calls rich_render with an invalid payload (empty title, non-finite coordinate). The host validator must fail the tool call and the UI must show the plugin error card.",
+  "repeatLast": true,
+  "titleResponse": { "text": "Invalid rich payload" },
+  "responses": [
+    {
+      "id": "f1-invalid-tool",
+      "kind": "tool_use",
+      "text": "I will try to render an invalid payload.",
+      "textChunkSize": 16,
+      "textChunkDelayMs": 20,
+      "toolName": "rich_render",
+      "toolInput": {
+        "content": {
+          "schemaVersion": 1,
+          "type": "line_plot",
+          "title": "",
+          "data": {
+            "series": [
+              { "name": "bad", "points": [{ "x": 0, "y": 0 }, { "x": 1, "y": null }] }
+            ]
+          }
+        }
+      },
+      "inputChunks": 3,
+      "inputChunkDelayMs": 80
+    },
+    {
+      "id": "f2-text",
+      "kind": "text",
+      "text": "The invalid payload was rejected by the host validator.",
+      "textChunkSize": 18,
+      "textChunkDelayMs": 20
+    }
+  ]
+}

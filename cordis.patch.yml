@@ -1,0 +1,32 @@
+# Bundle layer of dsh-study-mode.
+#
+# One Loader row mounts the Study Core and Rich Response Host plugins: RC.3
+# serves one browser module per package and rejects two active Loader rows that
+# resolve to the same package. Environment values are operator configuration
+# read at launch; none is derived from model output.
+- insert:
+    - id: dsh-study-mode
+      name: dsh-study-mode
+      config:
+        core:
+          databasePath: !!js process.env.DSH_STUDY_DATABASE
+          catalogPath: !!js process.env.DSH_STUDY_CATALOG
+          plansPath: !!js process.env.DSH_STUDY_PLANS
+          learnerId: local-learner
+          enableHumanReview: false
+        rich:
+          auditLog: !!js process.env.DSH_RICH_RESPONSE_AUDIT_LOG
+          maxTrackedAttempts: 512
+- insert:
+    - id: preset-study
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: study
+        name: Study Mode
+        description: 系统讲授、Host 作答证据与跨会话恢复
+        order: 4
+        plugins:
+          - id: study-agent
+            name: dsh-study-mode/agent
+          - id: study-skill-loader
+            name: '@deepseek-ai/dsh-tool-skill'
