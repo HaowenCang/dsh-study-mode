@@ -11,9 +11,9 @@
 import { useEffect, useState, type ReactElement } from 'react'
 import { imageBytes, readImageMeta, type ImageData, type ImageEnvelope, type ImageSource } from '../shared/image'
 import type { ToolResultBlock, ToolViewProps } from './contract'
-import { PHYSICS_SVG_THEME } from './physics-export'
+import { cardStyle, DSW } from './dsw'
 
-const theme = PHYSICS_SVG_THEME
+const theme = { text: DSW.text, muted: DSW.muted }
 
 const SOURCE_LABELS: Readonly<Record<ImageSource, string>> = {
   computed: '计算生成',
@@ -75,7 +75,7 @@ export function ImageFigure({ envelope, digest }: ImageFigureProps): ReactElemen
   return (
     <figure
       data-dsh-rich="image-card"
-      style={{ margin: 0, padding: 12, border: `1px solid ${theme.border}`, borderRadius: 10, background: theme.surface, color: theme.text, maxWidth: '100%', overflow: 'hidden' }}
+      style={{ ...cardStyle, margin: '6px 0' }}
     >
       {digest === 'pending' ? (
         <p data-dsh-rich="image-verifying" style={{ margin: 0, padding: '24px 0', textAlign: 'center', color: theme.muted }}>正在校验图片…</p>

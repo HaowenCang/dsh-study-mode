@@ -105,10 +105,10 @@ test('message card: settled action is disabled and marked as submitted', () => {
   const approve = rendered[0] as string
   assert.ok(approve.includes('data-dsh-rich-settled="true"'))
   assert.ok(approve.includes('disabled=""'))
-  assert.ok(approve.includes('aria-label="Approve (submitted)"'))
+  assert.ok(approve.includes('aria-label="Approve（已提交）"'))
   assert.ok(!(rendered[1] as string).includes('data-dsh-rich-settled="true"'))
   assert.ok((rendered[1] as string).includes('disabled=""'))
-  assert.match(markup, /Approve \[submitted\]/)
+  assert.match(markup, /Approve（已提交）/)
 })
 
 test('message card: idle buttons are enabled and not marked disabled', () => {

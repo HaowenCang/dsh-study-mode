@@ -3,7 +3,7 @@ import {StudyStore} from '../storage/journal.ts';
 import {parseCatalog,helps,publicQuestion,type Question,type Help} from '../domain/assessment/question.ts';
 import {gradeAnswer} from '../domain/assessment/grading.ts';
 import {capability,type Attempt} from '../domain/assessment/attempt.ts';
-import {nextStage,type Lesson} from '../domain/lesson/state.ts';
+import {lessonView,nextStage,type Lesson} from '../domain/lesson/state.ts';
 import {text} from '../shared/validation.ts';
 import {deriveProgress} from '../domain/evidence/progress.ts';
 import {courseCatalog} from '../domain/course/catalog.ts';
@@ -96,18 +96,22 @@ export class StudyEngine {
     // Read by payload identity as well, preserving already-recorded v1 events.
     const events=this.store.events(this.learnerId).filter(e=>e.kind==='teaching_exposure');
     const lesson=events.map(e=>e.payload as Lesson).filter(v=>v.courseId===courseId&&v.topicId===topicId).at(-1);
-    return lesson??{courseId,topicId,stage:'concept',exposureOnly:true};
+    return lesson??{courseId,topicId,stage:'not_started',exposureOnly:true};
   }
   advanceLesson(sessionId:string,courseId:string,topicId:string,stage:unknown,requestId:string){
     return this.transaction(sessionId,requestId,{operation:'teaching',courseId,topicId,stage},()=>{
       if(!this.catalog.some(q=>q.courseId===courseId&&q.topicId===topicId)&&!this.plans.some(p=>p.courseId===courseId&&p.days.some(d=>d.unit===topicId)))throw new Error('Unknown course/topic');
-      const lesson={...this.lesson(courseId,topicId),stage:nextStage(this.lesson(courseId,topicId).stage,stage)};
-      this.append('teaching_exposure',JSON.stringify(['lesson',courseId,topicId]),sessionId,lesson);return lesson;
+      const current=this.lesson(courseId,topicId);
+      // Repeating the stage already recorded is a no-op, so a retried call appends nothing.
+      if(stage===current.stage)return lessonView(current);
+      const lesson={...current,stage:nextStage(current.stage,stage)};
+      this.append('teaching_exposure',JSON.stringify(['lesson',courseId,topicId]),sessionId,lesson);return lessonView(lesson);
     });
   }
   history(attemptId:string){return this.store.events(this.learnerId,'attempt:'+attemptId);}
   plan(courseId:string,day?:number){
-    const plan=this.plans.find(p=>p.courseId===courseId);if(!plan)throw new Error('Unknown course plan');
+    const plan=this.plans.find(p=>p.courseId===courseId);
+    if(!plan)throw new Error(`No course plan for ${courseId}. study_get_state.plans lists the courses that have plans: ${this.plans.map(p=>p.courseId).join(', ')||'none'}`);
     const {days,...meta}=plan;
     if(day!==undefined){const selected=days.find(d=>d.day===day);if(!selected)throw new Error('Unknown plan day');return {...meta,day:selected,days:[]};}
     return {...meta,days:days.map(d=>({day:d.day,unit:d.unit,title:d.title}))};
@@ -138,7 +142,7 @@ export class StudyEngine {
       catalog.set(plan.courseId,topics);
     }
     const courses=[...catalog].map(([courseId,topicIds])=>({courseId,topicIds:[...topicIds],topics:[...topicIds].map(topicId=>({topicId,
-      lesson:lessons.get(JSON.stringify([courseId,topicId]))??{courseId,topicId,stage:'concept' as const,exposureOnly:true as const},
+      lesson:lessonView(lessons.get(JSON.stringify([courseId,topicId]))??{courseId,topicId,stage:'not_started',exposureOnly:true}),
       evidence:deriveProgress(evidence.filter(i=>i.question.courseId===courseId&&i.question.topicId===topicId)),
     }))}));
     return {learnerId:this.learnerId,mode:this.mode(),courses,plans:this.plans.map(p=>({courseId:p.courseId,title:p.title,startDate:p.startDate,endDate:p.endDate,evidenceStatus:p.evidenceStatus})),attempts:all.map(a=>this.view(a,all))};

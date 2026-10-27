@@ -28,6 +28,7 @@ import {
   type ImageSource,
 } from '../../shared/image'
 import { stripUnsafeText } from '../../shared/plain-text'
+import { FIGURE_OUTPUT_PROPERTIES, FIGURE_TOOL_NOTE, figureInstruction, writeFigure, type FigureFields, type FigureStore } from '../figures'
 import type { ToolDefinitionLike } from '../types'
 
 /** A resolved filesystem target (subset of RC.3 `FsTarget`). */
@@ -55,10 +56,12 @@ export interface ImageToolOptions {
   readonly services: () => ImageToolServices
   /** Per-image byte limit, an integer from 1024 to 2097152 (default 524288). */
   readonly maxImageBytes?: number
+  /** Store that receives a copy of the verified bytes for the inline answer line. */
+  readonly figures?: FigureStore
 }
 
 /** Canonical tool value persisted as the `tool/result` value. */
-export interface RichImageValue {
+export interface RichImageValue extends FigureFields {
   readonly image: ImageData
   readonly alt: string
   readonly caption?: string
@@ -81,6 +84,7 @@ const OUTPUT_SCHEMA: Record<string, unknown> = {
     sourceNote: { type: 'string' },
     path: { type: 'string' },
     summary: { type: 'string' },
+    ...FIGURE_OUTPUT_PROPERTIES,
   },
   required: ['image', 'alt', 'source', 'path', 'summary'],
   additionalProperties: false,
@@ -134,6 +138,9 @@ function fileName(displayPath: string): string {
   return name.length === 0 ? 'image' : name.slice(0, IMAGE_LIMITS.maxNameLength)
 }
 
+/** Figure-file extension of each verified media type. */
+const FIGURE_EXTENSIONS = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' } as const
+
 /** UNC, device (`\\?\`, `\\.\`) and drive-relative (`C:file`) spellings, refused on every platform. */
 const NON_LOCAL_PATH = /^(?:[\\/]{2}|[A-Za-z]:(?![\\/]))/
 
@@ -165,7 +172,8 @@ export function createImageTool(options: ImageToolOptions): ToolDefinitionLike {
       + 'SVG and other formats are refused; use rich_render, rich_heatmap or rich_mermaid for data you can express directly. '
       + 'source is "computed" (made by code run for this task) or "user_provided"; never claim an origin you do not know, and never show a file you did not find or create. '
       + 'alt must describe what the image shows. Only the learner sees the image; you receive a summary line without the picture, '
-      + 'and the bytes are stored in the session log. Call it directly, not from run_code.',
+      + 'and the bytes are stored in the session log. Call it directly, not from run_code.'
+      + (options.figures === undefined ? '' : FIGURE_TOOL_NOTE),
     parameters: {
       type: 'object',
       properties: {
@@ -180,7 +188,7 @@ export function createImageTool(options: ImageToolOptions): ToolDefinitionLike {
     },
     output: {
       schema: OUTPUT_SCHEMA,
-      render: (_args, rawValue) => [{ type: 'text', text: valueOf(rawValue).summary }],
+      render: (_args, rawValue) => [{ type: 'text', text: valueOf(rawValue).summary + figureInstruction(rawValue, options.figures) }],
       presentationMeta: (_args, rawValue): ImageEnvelope => {
         const value = valueOf(rawValue)
         return {
@@ -257,6 +265,7 @@ export function createImageTool(options: ImageToolOptions): ToolDefinitionLike {
         ...request.sourceNote === undefined ? {} : { sourceNote: request.sourceNote },
         path: target.displayPath,
         summary,
+        ...writeFigure(options.figures, exec, data, FIGURE_EXTENSIONS[inspection.mediaType], request.alt),
       } satisfies RichImageValue
     },
   }

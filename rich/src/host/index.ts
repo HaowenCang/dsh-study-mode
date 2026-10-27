@@ -3,6 +3,8 @@
  *
  * Registers, through the documented 0.2.1-rc.2 Host extension points only:
  *   * the `rich_render` agent tool (validated RichContentV1 payloads);
+ *   * the figure tools `rich_mermaid`, `rich_heatmap`, `rich_image` and `rich_svg`,
+ *     which also write a figure file the answer embeds with one Markdown line;
  *   * the `rich-interaction` human command (original-session audit record).
  *
  * No harness runtime package is imported: the bundle lives inside a profile
@@ -16,6 +18,8 @@ import { createPhysicsTool } from './tools/physics-demo'
 import { createMermaidTool } from './tools/rich-mermaid'
 import { createHeatmapTool } from './tools/rich-heatmap'
 import { createImageTool, type ImageToolServices } from './tools/rich-image'
+import { createSvgTool } from './tools/rich-svg'
+import { createFigureStore, defaultFiguresDir } from './figures'
 import type { HostConfig, HostContext } from './types'
 
 export const name = 'dsh-rich-response'
@@ -30,16 +34,21 @@ export function apply(ctx: HostContext, config?: HostConfig): void {
     ? config.auditLog
     : undefined
 
-  ctx.effect(() => ctx.tools.register(createRichRenderTool()))
+  const figuresDir = typeof config?.figuresDir === 'string' && config.figuresDir.length > 0 ? config.figuresDir : defaultFiguresDir()
+  const figures = createFigureStore(figuresDir)
+
+  ctx.effect(() => ctx.tools.register(createRichRenderTool({ figures })))
   ctx.effect(() => ctx.tools.register(createPhysicsTool()))
-  ctx.effect(() => ctx.tools.register(createMermaidTool()))
-  ctx.effect(() => ctx.tools.register(createHeatmapTool()))
+  ctx.effect(() => ctx.tools.register(createMermaidTool({ figures })))
+  ctx.effect(() => ctx.tools.register(createHeatmapTool({ figures })))
+  ctx.effect(() => ctx.tools.register(createSvgTool({ figures })))
   const imageTool = createImageTool({
     services: () => ({
       fs: ctx.get?.('fs') as ImageToolServices['fs'],
       workingDirectory: ctx.get?.('workingDirectory') as ImageToolServices['workingDirectory'],
     }),
     ...config?.maxImageBytes === undefined ? {} : { maxImageBytes: config.maxImageBytes },
+    figures,
   })
   ctx.effect(() => ctx.tools.register(imageTool))
   ctx.effect(() => ctx.commands.register(createRichInteractionCommand({
@@ -49,8 +58,9 @@ export function apply(ctx: HostContext, config?: HostConfig): void {
   })))
 
   ctx.logger.info(
-    'rich-response: host half registered (rich_render, rich_physics_demo, rich_mermaid, rich_heatmap, rich_image tools, rich-interaction command, auditLog=%s)',
+    'rich-response: host half registered (rich_render, rich_physics_demo, rich_mermaid, rich_heatmap, rich_image, rich_svg tools, rich-interaction command, auditLog=%s, figuresDir=%s)',
     auditLog ?? '<none>',
+    figuresDir,
   )
 }
 

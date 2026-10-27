@@ -76,4 +76,10 @@ export interface HostConfig {
   readonly maxTrackedAttempts?: number
   /** Per-image byte limit of `rich_image`, an integer from 1024 to 2097152 (default 524288). */
   readonly maxImageBytes?: number
+  /**
+   * Absolute directory of the figure files embedded in answers (default
+   * `<DSH_HOME or ~/.dsh>/rich-response/figures`). It must be readable through
+   * the DSH file route, which serves only paths its filesystem policy allows.
+   */
+  readonly figuresDir?: string
 }

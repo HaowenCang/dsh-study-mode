@@ -185,7 +185,7 @@ try {
   const errorResult = toolResultsF.find((event) => event.data?.message?.isError === true)
   record('F.ui.errorCard', errorCard !== undefined, `cards=${JSON.stringify(cardsF.map((card) => card.kinds))}`)
   record('F.ui.statusError', errorCard?.attrs['data-dsh-rich-status'] === 'error', `status=${errorCard?.attrs['data-dsh-rich-status']}`)
-  record('F.ui.errorText', /tool call failed/i.test(errorCard?.text ?? ''), (errorCard?.text ?? '').slice(0, 200))
+  record('F.ui.errorText', /工具调用失败|tool call failed/i.test(errorCard?.text ?? ''), (errorCard?.text ?? '').slice(0, 200))
   record('F.log.toolResultIsError', errorResult !== undefined, `results=${toolResultsF.length} isError=${errorResult?.data?.message?.isError}`)
   record('F.log.validationCode', JSON.stringify(errorResult?.data ?? {}).includes('INVALID_TITLE')
     || JSON.stringify(errorResult?.data ?? {}).includes('NON_FINITE_NUMBER'),

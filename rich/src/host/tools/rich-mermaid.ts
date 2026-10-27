@@ -15,10 +15,12 @@ import {
   type RichMetaEnvelopeV1,
 } from '../../shared/index'
 import { compileMermaidFlowchart, MERMAID_LIMITS, type MermaidDirection } from '../../shared/mermaid'
+import { diagramFigureSvg } from '../../shared/figure-svg'
+import { FIGURE_OUTPUT_PROPERTIES, FIGURE_TOOL_NOTE, figureInstruction, writeFigure, type FigureFields, type FigureToolOptions } from '../figures'
 import type { ToolDefinitionLike } from '../types'
 
 /** Canonical tool value persisted as `tool/result` content + meta source. */
-export interface RichMermaidValue {
+export interface RichMermaidValue extends FigureFields {
   readonly content: BasicDiagramContent
   readonly summary: string
   readonly direction: MermaidDirection
@@ -34,6 +36,7 @@ const OUTPUT_SCHEMA: Record<string, unknown> = {
     summary: { type: 'string' },
     direction: { type: 'string', enum: ['TD', 'BT', 'LR', 'RL'] },
     layers: { type: 'integer' },
+    ...FIGURE_OUTPUT_PROPERTIES,
   },
   required: ['content', 'summary', 'direction', 'layers'],
   additionalProperties: false,
@@ -50,7 +53,7 @@ function valueOf(value: unknown): RichMermaidValue {
 }
 
 /** Build the agent tool definition; registration is the caller's effect. */
-export function createMermaidTool(): ToolDefinitionLike {
+export function createMermaidTool(options: FigureToolOptions = {}): ToolDefinitionLike {
   return {
     name: 'rich_mermaid',
     description:
@@ -60,7 +63,8 @@ export function createMermaidTool(): ToolDefinitionLike {
       + 'Ids use letters, digits and _; ([stadium]) is drawn as a rounded box. Labels are plain text (no <br>, HTML, entities or markdown); write averages as \u27E8p\u27E9, not <p>. '
       + 'Not supported: subgraph, click, style/classDef/linkStyle, other diagram types, &, ---, ==>, two links between the same pair of nodes. '
       + `At most ${String(MERMAID_LIMITS.maxLayers)} levels along the main direction and about 5 nodes side by side; `
-      + 'unsupported syntax, overcrowded levels, or links that would cross other nodes or hide their labels fail with issues to fix.',
+      + 'unsupported syntax, overcrowded levels, or links that would cross other nodes or hide their labels fail with issues to fix.'
+      + (options.figures === undefined ? '' : FIGURE_TOOL_NOTE),
     parameters: {
       type: 'object',
       properties: {
@@ -73,7 +77,7 @@ export function createMermaidTool(): ToolDefinitionLike {
     },
     output: {
       schema: OUTPUT_SCHEMA,
-      render: (_args, rawValue) => [{ type: 'text', text: valueOf(rawValue).summary }],
+      render: (_args, rawValue) => [{ type: 'text', text: valueOf(rawValue).summary + figureInstruction(rawValue, options.figures) }],
       presentationMeta: (_args, rawValue): RichMetaEnvelopeV1 => ({
         kind: RICH_META_KIND,
         envelopeVersion: RICH_META_ENVELOPE_VERSION,
@@ -105,6 +109,7 @@ export function createMermaidTool(): ToolDefinitionLike {
         summary,
         direction: result.direction,
         layers: result.layers,
+        ...writeFigure(options.figures, exec, diagramFigureSvg(result.content), 'svg', result.content.title),
       } satisfies RichMermaidValue
     },
   }

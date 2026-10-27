@@ -19,10 +19,13 @@ import {
   type RichContentV1,
   type RichMetaEnvelopeV1,
 } from '../../shared/index'
+import { RICH_RENDER_CONTENT_SCHEMA } from '../../shared/tool-schemas'
+import { richContentFigureSvg } from '../../shared/figure-svg'
+import { FIGURE_OUTPUT_PROPERTIES, FIGURE_TOOL_NOTE, figureInstruction, writeFigure, type FigureFields, type FigureToolOptions } from '../figures'
 import type { ToolDefinitionLike } from '../types'
 
 /** Canonical tool value persisted as `tool/result` content + meta source. */
-export interface RichRenderValue {
+export interface RichRenderValue extends FigureFields {
   readonly content: RichContentV1
   readonly summary: string
 }
@@ -38,6 +41,7 @@ const OUTPUT_SCHEMA: Record<string, unknown> = {
   properties: {
     content: { type: 'object' },
     summary: { type: 'string' },
+    ...FIGURE_OUTPUT_PROPERTIES,
   },
   required: ['content', 'summary'],
   additionalProperties: false,
@@ -52,7 +56,7 @@ function valueOf(value: unknown): RichRenderValue {
 }
 
 /** Build the agent tool definition; registration is the caller's effect. */
-export function createRichRenderTool(): ToolDefinitionLike {
+export function createRichRenderTool(options: FigureToolOptions = {}): ToolDefinitionLike {
   return {
     name: 'rich_render',
     description:
@@ -60,7 +64,8 @@ export function createRichRenderTool(): ToolDefinitionLike {
       + 'Use it for function curves (line_plot), charts (scatter_plot), simple diagrams (basic_diagram), '
       + `and interactive message cards (message_card). The payload must be RichContentV1 with schemaVersion ${String(RICH_CONTENT_SCHEMA_VERSION)}; `
       + `at most ${String(RICH_LIMITS.maxSeries)} series, ${String(RICH_LIMITS.maxPointsPerSeries)} points per series, `
-      + 'finite coordinates only. Never put HTML, SVG source, URLs, or executable expressions in the payload.',
+      + 'finite coordinates only. Never put HTML, SVG source, URLs, or executable expressions in the payload.'
+      + (options.figures === undefined ? '' : FIGURE_TOOL_NOTE),
     // Raw model-facing JSON Schema (a plain ToolDefinition passes `parameters`
     // straight through to the provider). The author-side schema DSL is only
     // compiled by `defineTool`, which this zero-dependency plugin does not use;
@@ -68,11 +73,7 @@ export function createRichRenderTool(): ToolDefinitionLike {
     parameters: {
       type: 'object',
       properties: {
-        content: {
-          type: 'object',
-          description:
-            'RichContentV1 object: { schemaVersion: 1, type: "line_plot"|"scatter_plot"|"basic_diagram"|"message_card", title, data/body, ... }.',
-        },
+        content: RICH_RENDER_CONTENT_SCHEMA,
       },
       required: ['content'],
       additionalProperties: false,
@@ -81,7 +82,7 @@ export function createRichRenderTool(): ToolDefinitionLike {
       schema: OUTPUT_SCHEMA,
       render: (_args, rawValue) => {
         const value = valueOf(rawValue)
-        return [{ type: 'text', text: value.summary }]
+        return [{ type: 'text', text: value.summary + figureInstruction(rawValue, options.figures) }]
       },
       presentationMeta: (_args, rawValue): RichMetaEnvelopeV1 => {
         const value = valueOf(rawValue)
@@ -102,6 +103,7 @@ export function createRichRenderTool(): ToolDefinitionLike {
       return {
         content: result.value,
         summary: summarizeRichContent(result.value),
+        ...writeFigure(options.figures, exec, richContentFigureSvg(result.value), 'svg', result.value.title),
       } satisfies RichRenderValue
     },
   }

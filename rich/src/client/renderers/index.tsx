@@ -23,9 +23,9 @@ function RenderFailure({ message, code }: { readonly message: string; readonly c
     <div
       data-dsh-rich="render-error"
       role="alert"
-      style={{ padding: '10px 12px', border: '1px solid #c62828', borderRadius: '8px', color: '#c62828' }}
+      style={{ padding: '10px 12px', border: '0.5px solid var(--dsw-alias-state-error-primary, #c62828)', borderRadius: 'var(--dsw-radius-md, 8px)', color: 'var(--dsw-alias-state-error-primary, #c62828)' }}
     >
-      <strong>Rich response could not be rendered.</strong>
+      <strong>图形无法显示。</strong>
       <div style={{ opacity: 0.8 }}>{code}: {message}</div>
     </div>
   )

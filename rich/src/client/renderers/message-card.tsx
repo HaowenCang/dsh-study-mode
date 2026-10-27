@@ -38,8 +38,8 @@ export function MessageCard({ content, theme, onAction, busy, feedback, settledA
         display: 'flex',
         flexDirection: 'column',
         gap: '8px',
-        border: `1px solid ${theme.border}`,
-        borderRadius: '10px',
+        border: `0.5px solid ${theme.border}`,
+        borderRadius: 'var(--dsw-radius-md, 10px)',
         background: theme.surface,
         color: theme.text,
         padding: '10px 12px',
@@ -80,14 +80,14 @@ export function MessageCard({ content, theme, onAction, busy, feedback, settledA
                 data-dsh-rich-settled={settled ? 'true' : undefined}
                 disabled={disabled}
                 aria-disabled={disabled}
-                aria-label={settled ? `${action.label} (submitted)` : action.label}
+                aria-label={settled ? `${action.label}（已提交）` : action.label}
                 onClick={() => {
                   if (!disabled) onAction(action.id)
                 }}
                 style={{
                   padding: '5px 12px',
                   borderRadius: '6px',
-                  border: `1px solid ${settled ? theme.accent : theme.border}`,
+                  border: `0.5px solid ${settled ? theme.accent : theme.border}`,
                   background: settled ? theme.accent : 'transparent',
                   color: settled ? '#ffffff' : theme.text,
                   font: 'inherit',
@@ -97,7 +97,7 @@ export function MessageCard({ content, theme, onAction, busy, feedback, settledA
                 }}
               >
                 {action.label}
-                {settled ? ' [submitted]' : ''}
+                {settled ? '（已提交）' : ''}
               </button>
             )
           })}

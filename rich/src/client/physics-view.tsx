@@ -5,6 +5,7 @@ import {LinePlot} from './renderers/line-plot'
 import type {RendererTheme} from './renderers/types'
 import type {ToolViewProps} from './contract'
 import type {PlotSeries} from '../shared/protocol'
+import {buttonStyle,cardStyle,noteStyle} from './dsw'
 import {copyPhysicsData,createPhysicsSvgExport,enterPhysicsFullscreen,PHYSICS_SVG_THEME,physicsSvgDetails,type PhysicsPreferences} from './physics-export'
 
 const theme:RendererTheme=PHYSICS_SVG_THEME
@@ -43,8 +44,8 @@ function PhysicsDemoCard({demo,storageKey}:{demo:PhysicsDemo;storageKey:string})
       setNotice('已导出当前 SVG。')
     }catch{setNotice('当前浏览器无法导出 SVG。')}
   }
-  return <section ref={root} data-physics-demo={demo} style={{padding:16,border:'1px solid '+theme.border,borderRadius:12,background:theme.surface,color:theme.text,maxWidth:'100%',overflow:'auto'}}>
-    <header><strong>{demo==='infinite_well'?'一维无限深方势阱':demo==='harmonic_oscillator'?'经典简谐振子':'二维 Ising 有限构型'}</strong><p style={{fontSize:12,color:theme.muted}}>确定性计算 · 参数变化仅影响演示，不改变学习成绩。</p></header>
+  return <section ref={root} data-physics-demo={demo} style={{...cardStyle,overflow:'auto'}}>
+    <header><strong>{demo==='infinite_well'?'一维无限深方势阱':demo==='harmonic_oscillator'?'经典简谐振子':'二维 Ising 有限构型'}</strong><p style={{...noteStyle,marginTop:2}}>确定性计算 · 参数变化仅影响演示，不改变学习成绩。</p></header>
     {calculation.kind==='well'?<>
       {slider('量子数 n','n',1,10,1)}
       <label><input type="checkbox" checked={p.density} onChange={e=>set('density',e.target.checked)}/>显示概率密度</label>
@@ -72,7 +73,7 @@ function PhysicsDemoCard({demo,storageKey}:{demo:PhysicsDemo;storageKey:string})
       <p data-physics-magnetization={calculation.data.magnetization}>红 +1 / 蓝 −1；磁化强度 M/N²={calculation.data.magnetization.toFixed(6)}；每自旋能量={calculation.data.energyPerSpin.toFixed(6)}（J=1）。</p>
       <p>周期边界；这是单个有限构型，随机示例不是有限温度 Monte Carlo 采样，不能据此判定临界温度或热力学极限。</p>
     </>}
-    <footer style={{display:'flex',gap:10,flexWrap:'wrap'}}><button type="button" onClick={exportSvg}>导出 SVG</button><button type="button" onClick={()=>{void enterPhysicsFullscreen(root.current).then(setNotice)}}>全屏</button><button type="button" onClick={()=>{void copyPhysicsData(calculation.data,typeof navigator==='undefined'?undefined:navigator.clipboard).then(setNotice)}}>复制数据</button></footer>
+    <footer style={{display:'flex',gap:10,flexWrap:'wrap'}}><button type="button" style={buttonStyle} onClick={exportSvg}>导出 SVG</button><button type="button" style={buttonStyle} onClick={()=>{void enterPhysicsFullscreen(root.current).then(setNotice)}}>全屏</button><button type="button" style={buttonStyle} onClick={()=>{void copyPhysicsData(calculation.data,typeof navigator==='undefined'?undefined:navigator.clipboard).then(setNotice)}}>复制数据</button></footer>
     <p role="status" aria-live="polite">{notice}</p>
   </section>
 }

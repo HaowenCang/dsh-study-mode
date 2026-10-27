@@ -68,6 +68,10 @@
  *   http_error  plain HTTP JSON `{error:{...}}` before any SSE byte
  *   reset       destroy the socket without a response
  *
+ * Text placeholders: `{{figure:N}}` in a text response is replaced by the N-th Markdown
+ * image line (`![alt](path)`, 0-based, in message order) found in the request's tool
+ * results, standing in for a model that copies a figure tool's line into its answer.
+ *
  * The canned title reply keeps the transcript deterministic even if the
  * first-prompt LLM title provider is mounted: title requests are detected from
  * the system prompt and answered without consuming the scenario cursor.
@@ -303,8 +307,18 @@ function summarizeBody(body) {
     systemLength: typeof body?.system === 'string' ? body.system.length : null,
     lastUserText: null,
     toolResultCount: 0,
+    figureLines: [],
   }
   if (Array.isArray(body?.messages)) {
+    for (const message of body.messages) {
+      for (const block of Array.isArray(message?.content) ? message.content : []) {
+        if (block?.type !== 'tool_result') continue
+        const text = typeof block.content === 'string'
+          ? block.content
+          : (Array.isArray(block.content) ? block.content : []).map((part) => typeof part?.text === 'string' ? part.text : '').join('\n')
+        summary.figureLines.push(...(text.match(/^!\[[^\]\n]*\]\([^\s()]+\)$/gm) ?? []))
+      }
+    }
     for (let i = body.messages.length - 1; i >= 0; i -= 1) {
       const message = body.messages[i]
       const content = message?.content
@@ -418,6 +432,9 @@ const server = createServer(async (request, response) => {
     const selected = selectResponse(doc, summary)
     spec = selected.spec
     index = selected.index
+    if (spec?.kind === 'text' && typeof spec.text === 'string' && spec.text.includes('{{figure:')) {
+      spec = { ...spec, text: spec.text.replace(/\{\{figure:(\d+)\}\}/g, (_all, n) => summary.figureLines[Number(n)] ?? '(no figure line ' + n + ')') }
+    }
     record.spec = spec
   }
 

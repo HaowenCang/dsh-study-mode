@@ -9,7 +9,7 @@
  *
  * Failure, interruption, unsupported versions, and malformed payloads all
  * degrade to an explicit, bounded card instead of throwing into the transcript.
- * Source file text is ASCII-only on purpose: it survives any toolchain.
+ * Styling uses the DSH alias tokens (UI-01); internal ids stay in data attributes only.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
@@ -23,15 +23,16 @@ import type { ClientContext, ContentBlockLike, ToolResultBlock, ToolViewProps } 
 import { submitInteraction, type InteractionOutcome } from './interactions'
 import { RichContentView } from './renderers/index'
 import type { RendererTheme } from './renderers/types'
+import { cardStyle, DSW } from './dsw'
 
 const SERIES_COLORS = ['#d94f2b', '#247bbf', '#1a7f37', '#8e44ad', '#c98a00', '#0f766e', '#b0355b', '#475569']
 
 function themeOf(): RendererTheme {
   return {
-    text: 'var(--dsw-color-text-primary, #1b1f24)',
-    muted: 'var(--dsw-color-text-secondary, #6b7280)',
-    border: 'var(--dsw-color-border, #d9dee7)',
-    surface: 'var(--dsw-color-bg-secondary, #f6f7f9)',
+    text: DSW.text,
+    muted: DSW.muted,
+    border: DSW.border,
+    surface: DSW.layer,
     accent: '#247bbf',
     series: SERIES_COLORS,
   }
@@ -115,16 +116,22 @@ function stageOf(props: ToolViewProps, previewArgs: boolean): Stage {
   return { kind: 'missing' }
 }
 
+/** Visible card label per content type. */
+const TYPE_LABELS: Readonly<Record<RichContentV1['type'], string>> = {
+  line_plot: '函数图像',
+  scatter_plot: '散点图',
+  basic_diagram: '示意图',
+  message_card: '消息卡片',
+}
+
 function Frame(props: {
   readonly phase: string
   readonly callId: string
   readonly sessionId: string
   readonly status: string
   readonly title: string
-  readonly badge: string
   readonly children: React.ReactNode
 }) {
-  const shortCall = props.callId.length > 18 ? props.callId.slice(0, 18) + '...' : props.callId
   return (
     <section
       data-dsh-rich="tool-card"
@@ -132,30 +139,16 @@ function Frame(props: {
       data-dsh-rich-status={props.status}
       data-dsh-rich-call-id={props.callId}
       data-dsh-rich-session={props.sessionId}
-      style={{
-        border: '1px solid var(--dsw-color-border, #d9dee7)',
-        borderRadius: '10px',
-        padding: '10px 12px',
-        margin: '6px 0',
-        background: 'var(--dsw-color-bg-primary, #ffffff)',
-        color: 'var(--dsw-color-text-primary, #1b1f24)',
-        font: '13px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif',
-        maxWidth: '100%',
-        overflow: 'hidden',
-      }}
+      style={cardStyle}
     >
-      <header style={{ display: 'flex', alignItems: 'baseline', gap: '8px', marginBottom: '6px' }}>
-        <strong style={{ fontSize: '13px' }}>{props.title}</strong>
-        <span style={{ opacity: 0.65, fontSize: '12px' }}>{props.badge}</span>
-        <span style={{ marginLeft: 'auto', opacity: 0.45, fontSize: '11px' }} title={props.callId}>{shortCall}</span>
-      </header>
+      <header style={{ marginBottom: '6px', fontSize: '12px', color: DSW.muted }}>{props.title}</header>
       {props.children}
     </section>
   )
 }
 
 function Note(props: { readonly tone?: 'error' | 'muted'; readonly children: React.ReactNode }) {
-  const color = props.tone === 'error' ? '#c62828' : 'var(--dsw-color-text-secondary, #6b7280)'
+  const color = props.tone === 'error' ? DSW.error : DSW.muted
   return <div style={{ color, fontSize: '12px', padding: '4px 0' }}>{props.children}</div>
 }
 
@@ -214,52 +207,52 @@ export function createToolView(ctx: ClientContext, options: { readonly previewAr
       ? undefined
       : action.status === 'settled'
         ? action.outcome.text
-          + (action.outcome.followUpQueued ? ' | follow-up queued in this session' : '')
-          + (action.outcome.duplicate ? ' | duplicate attempt observed by host' : '')
+          + (action.outcome.followUpQueued ? ' · 已在本会话排队后续回复' : '')
+          + (action.outcome.duplicate ? ' · Host 已记录重复作答' : '')
         : action.outcome.text
 
-    const badge = content === undefined ? props.phase : content.type + ' | v1'
+    const title = content === undefined ? '图形' : TYPE_LABELS[content.type]
     const status = stage.kind === 'ready'
       ? (action.status === 'error' ? 'action-error' : action.status === 'settled' ? 'interacted' : 'ok')
       : stage.kind
 
     return (
-      <Frame phase={props.phase} callId={props.callId} sessionId={props.sessionId} status={status} title="Rich response" badge={badge}>
-        {stage.kind === 'preparing' ? <Note>preparing rich content...</Note> : null}
-        {stage.kind === 'preview' ? <Note>running - live preview from validated arguments</Note> : null}
+      <Frame phase={props.phase} callId={props.callId} sessionId={props.sessionId} status={status} title={title}>
+        {stage.kind === 'preparing' ? <Note>正在准备图形…</Note> : null}
+        {stage.kind === 'preview' ? <Note>生成中 · 根据已校验的参数实时预览</Note> : null}
         {stage.kind === 'error' ? (
           <div data-dsh-rich="error-state" role="alert">
-            <Note tone="error">tool call failed ({stage.code})</Note>
+            <Note tone="error">工具调用失败（{stage.code}）</Note>
             <div style={{ fontSize: '12px', opacity: 0.8, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{stage.text}</div>
           </div>
         ) : null}
         {stage.kind === 'unsupported' ? (
           <div data-dsh-rich="unsupported-version" role="alert">
-            <Note tone="error">unsupported rich content version {String(stage.version ?? 'unknown')}; expected schemaVersion 1.</Note>
+            <Note tone="error">不支持的图形内容版本 {String(stage.version ?? '未知')}；需要 schemaVersion 1。</Note>
             <details>
-              <summary style={{ cursor: 'pointer', fontSize: '12px' }}>raw payload</summary>
+              <summary style={{ cursor: 'pointer', fontSize: '12px' }}>原始数据</summary>
               <pre style={{ maxHeight: '180px', overflow: 'auto', fontSize: '11px' }}>{stage.raw}</pre>
             </details>
           </div>
         ) : null}
         {stage.kind === 'unsupported-envelope' ? (
           <div data-dsh-rich="unsupported-envelope" role="alert">
-            <Note tone="error">unsupported rich meta envelope version {String(stage.version ?? 'unknown')}; expected envelopeVersion 1.</Note>
+            <Note tone="error">不支持的图形记录版本 {String(stage.version ?? '未知')}；需要 envelopeVersion 1。</Note>
             <details>
-              <summary style={{ cursor: 'pointer', fontSize: '12px' }}>raw payload</summary>
+              <summary style={{ cursor: 'pointer', fontSize: '12px' }}>原始数据</summary>
               <pre style={{ maxHeight: '180px', overflow: 'auto', fontSize: '11px' }}>{stage.raw}</pre>
             </details>
           </div>
         ) : null}
         {stage.kind === 'invalid' ? (
           <div data-dsh-rich="invalid-payload" role="alert">
-            <Note tone="error">the persisted rich payload failed validation.</Note>
+            <Note tone="error">保存的图形数据未通过校验。</Note>
             <div style={{ fontSize: '12px', opacity: 0.8, wordBreak: 'break-word' }}>{stage.text}</div>
           </div>
         ) : null}
         {stage.kind === 'missing' ? (
           <div data-dsh-rich="missing-payload">
-            <Note>this tool result carries no rich payload; showing the tool text only.</Note>
+            <Note>此工具结果没有图形数据，仅显示工具文本。</Note>
           </div>
         ) : null}
         {content !== undefined ? (
@@ -273,10 +266,10 @@ export function createToolView(ctx: ClientContext, options: { readonly previewAr
           />
         ) : null}
         {action.status === 'error' ? (
-          <div data-dsh-rich="action-error" style={{ color: '#c62828', fontSize: '12px', marginTop: '4px' }}>{feedback}</div>
+          <div data-dsh-rich="action-error" style={{ color: DSW.error, fontSize: '12px', marginTop: '4px' }}>{feedback}</div>
         ) : null}
         {action.status === 'settled' ? (
-          <div data-dsh-rich="action-ack" style={{ color: '#1a7f37', fontSize: '12px', marginTop: '4px' }}>{feedback}</div>
+          <div data-dsh-rich="action-ack" style={{ color: DSW.success, fontSize: '12px', marginTop: '4px' }}>{feedback}</div>
         ) : null}
       </Frame>
     )

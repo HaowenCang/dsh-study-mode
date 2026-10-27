@@ -16,10 +16,13 @@ import {
   type HeatmapContent,
   type HeatmapEnvelope,
 } from '../../shared/heatmap'
+import { HEATMAP_CONTENT_SCHEMA } from '../../shared/tool-schemas'
+import { heatmapFigureSvg } from '../../shared/figure-svg'
+import { FIGURE_OUTPUT_PROPERTIES, FIGURE_TOOL_NOTE, figureInstruction, writeFigure, type FigureFields, type FigureToolOptions } from '../figures'
 import type { ToolDefinitionLike } from '../types'
 
 /** Canonical tool value persisted as the `tool/result` value. */
-export interface RichHeatmapValue {
+export interface RichHeatmapValue extends FigureFields {
   readonly content: HeatmapContent
   readonly summary: string
 }
@@ -29,6 +32,7 @@ const OUTPUT_SCHEMA: Record<string, unknown> = {
   properties: {
     content: { type: 'object' },
     summary: { type: 'string' },
+    ...FIGURE_OUTPUT_PROPERTIES,
   },
   required: ['content', 'summary'],
   additionalProperties: false,
@@ -43,7 +47,7 @@ function valueOf(value: unknown): RichHeatmapValue {
 }
 
 /** Build the agent tool definition; registration is the caller's effect. */
-export function createHeatmapTool(): ToolDefinitionLike {
+export function createHeatmapTool(options: FigureToolOptions = {}): ToolDefinitionLike {
   return {
     name: 'rich_heatmap',
     description:
@@ -55,24 +59,19 @@ export function createHeatmapTool(): ToolDefinitionLike {
       + 'yAxis min/max always run bottom to top, so with origin "upper" values[0] lies at yAxis.max. '
       + 'Axis min/max give the coordinates of the grid edges. colorScale.palette is "sequential" (default) or "diverging" '
       + '(centered on the scale midpoint; without an explicit range it is symmetric around 0). An explicit colorScale range must contain every value. '
-      + 'The learner sees the picture; you receive only a summary line.',
+      + 'The learner sees the picture; you receive only a summary line.'
+      + (options.figures === undefined ? '' : FIGURE_TOOL_NOTE),
     parameters: {
       type: 'object',
       properties: {
-        content: {
-          type: 'object',
-          description:
-            'HeatmapV1: { schemaVersion: 1, title, subtitle?, values: number[][], origin?: "lower"|"upper", '
-            + 'xAxis?: { label?, unit?, min?, max? }, yAxis?: { label?, unit?, min?, max? }, '
-            + 'colorScale?: { palette?: "sequential"|"diverging", label?, unit?, min?, max? } }.',
-        },
+        content: HEATMAP_CONTENT_SCHEMA,
       },
       required: ['content'],
       additionalProperties: false,
     },
     output: {
       schema: OUTPUT_SCHEMA,
-      render: (_args, rawValue) => [{ type: 'text', text: valueOf(rawValue).summary }],
+      render: (_args, rawValue) => [{ type: 'text', text: valueOf(rawValue).summary + figureInstruction(rawValue, options.figures) }],
       presentationMeta: (_args, rawValue): HeatmapEnvelope => ({
         kind: HEATMAP_META_KIND,
         envelopeVersion: HEATMAP_ENVELOPE_VERSION,
@@ -86,7 +85,11 @@ export function createHeatmapTool(): ToolDefinitionLike {
       if (extra.length > 0) throw new Error(`rich_heatmap: unexpected argument ${extra.slice(0, 3).join(', ')}`)
       const result = validateHeatmap((args as { content?: unknown }).content)
       if (!result.ok) throw new Error(`rich_heatmap: invalid HeatmapV1 payload: ${formatHeatmapIssues(result.issues)}`)
-      return { content: result.value, summary: summarizeHeatmap(result.value) } satisfies RichHeatmapValue
+      return {
+        content: result.value,
+        summary: summarizeHeatmap(result.value),
+        ...writeFigure(options.figures, exec, heatmapFigureSvg(result.value), 'svg', result.value.title),
+      } satisfies RichHeatmapValue
     },
   }
 }

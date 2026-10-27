@@ -73,3 +73,16 @@ test('Study preset admits the heatmap and workspace image tools and names them i
   assert.match(policy,/rich_image/);
   assert.match(policy,/只展示学生明确给出路径的图片文件，不要猜测或遍历文件路径/);
 });
+
+test('VIS-03: Study preset admits rich_svg and tells the model to place the returned figure line in its answer',async()=>{
+  const {configureStudyAgent}=await import('../src/agent/index.ts');
+  let restriction:{deny:string[]}|undefined,guard:((exec:{name:string;arguments:unknown})=>string|undefined)|undefined,policy='';
+  const tools={presentAs:()=>()=>{},schemas:()=>['rich_svg','rich_render','pwsh'].map(name=>({name})),restrict:(filter:{deny:string[]})=>{restriction=filter;return()=>{};},guard:(value:typeof guard)=>{guard=value;return()=>{};}};
+  configureStudyAgent({effect:(f:()=>()=>void)=>{f();},tools,systemPrompt:{getSectionOrder:()=>1,section:(section:{text:string})=>{policy=section.text;return()=>{};}},skills:{register:()=>()=>{}}},'Skill');
+  assert.deepEqual(restriction?.deny,['pwsh']);
+  assert.equal(guard!({name:'rich_svg',arguments:{title:'t',svg:'<svg viewBox="0 0 1 1"/>'}}),undefined);
+  assert.match(policy,/rich_svg/);
+  assert.match(policy,/!\[/);
+  assert.match(policy,/原样复制/);
+  assert.match(policy,/不要在回答中直接书写 SVG/);
+});

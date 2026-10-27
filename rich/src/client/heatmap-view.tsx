@@ -21,6 +21,7 @@ import type { ToolResultBlock, ToolViewProps } from './contract'
 import { axisTitleText, clamp, niceTicks, normalizeChartWidth } from './renderers/chart/scale'
 import { useContainerWidth } from './renderers/chart/use-width'
 import { PHYSICS_SVG_THEME } from './physics-export'
+import { buttonStyle, cardStyle, DSW, noteStyle } from './dsw'
 
 const theme = PHYSICS_SVG_THEME
 const MARGIN = { top: 30, right: 92, bottom: 44, left: 60 } as const
@@ -224,14 +225,14 @@ function HeatmapCard({ content }: { readonly content: HeatmapContent }): ReactEl
   }
   const scale = resolveHeatmapScale(content)
   return (
-    <section ref={root} data-dsh-rich="heatmap-card" style={{ padding: 12, border: `1px solid ${theme.border}`, borderRadius: 10, background: theme.surface, color: theme.text, maxWidth: '100%', overflow: 'hidden' }}>
-      {content.subtitle === undefined ? null : <p style={{ margin: '0 0 6px', fontSize: 12, color: theme.muted }}>{content.subtitle}</p>}
+    <section ref={root} data-dsh-rich="heatmap-card" style={cardStyle}>
+      {content.subtitle === undefined ? null : <p style={{ ...noteStyle, marginBottom: 6 }}>{content.subtitle}</p>}
       <Heatmap content={content} />
-      <p style={{ margin: '6px 0', fontSize: 12, color: theme.muted }}>
+      <p style={{ ...noteStyle, margin: '6px 0' }}>
         {`${content.colorScale.palette === 'diverging' ? '发散色标，中点' : '顺序色标，范围'} ${formatHeatmapNumber(content.colorScale.palette === 'diverging' ? (scale.min + scale.max) / 2 : scale.min)}${content.colorScale.palette === 'diverging' ? '' : ` 至 ${formatHeatmapNumber(scale.max)}`}；${content.origin === 'lower' ? '第 0 行在底部' : '第 0 行在顶部'}；悬停格子可查看数值。`}
       </p>
-      <footer style={{ display: 'flex', gap: 10 }}><button type="button" onClick={exportSvg}>导出 SVG</button></footer>
-      <p role="status" aria-live="polite" style={{ margin: 0, fontSize: 12 }}>{notice}</p>
+      <footer style={{ display: 'flex', gap: 8 }}><button type="button" style={buttonStyle} onClick={exportSvg}>导出 SVG</button></footer>
+      <p role="status" aria-live="polite" style={{ ...noteStyle, color: DSW.muted }}>{notice}</p>
     </section>
   )
 }

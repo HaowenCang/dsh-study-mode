@@ -63,7 +63,7 @@ test('open work remains pending until human review; original evidence is not ove
 
 test('teaching stages persist across sessions without creating ability evidence',async t=>{
   const {engine,databasePath}=await fixture();
-  assert.equal(engine.lesson('synthetic-physics','oscillation').stage,'concept');
+  assert.equal(engine.lesson('synthetic-physics','oscillation').stage,'not_started');
   assert.throws(()=>engine.advanceLesson('s','synthetic-physics','oscillation','derivation','skip'),/stage|sequence/i);
   engine.advanceLesson('s','synthetic-physics','oscillation','mathematical_modeling','t1');
   engine.close();
@@ -133,7 +133,27 @@ test('course and topic IDs containing separators have independent teaching state
   const a={...catalog[3],id:'topic-a',courseId:'a:b',topicId:'c'},b={...catalog[3],id:'topic-b',courseId:'a',topicId:'b:c'};
   const {engine}=await fixture(undefined,[a,b]);t.after(()=>engine.close());
   engine.advanceLesson('s','a:b','c','mathematical_modeling','t1');
-  assert.equal(engine.lesson('a','b:c').stage,'concept');
+  assert.equal(engine.lesson('a','b:c').stage,'not_started');
   engine.advanceLesson('s','a','b:c','mathematical_modeling','t2');
   assert.equal(engine.lesson('a','b:c').courseId,'a');
+});
+
+test('TOOLS-01: the first stage is concept, errors name the next stage, and repeating a stage records nothing',async t=>{
+  const {engine}=await fixture();t.after(()=>engine.close());
+  const exposures=()=>engine['store'].events(engine['learnerId']).filter((e:{kind:string})=>e.kind==='teaching_exposure').length;
+  assert.equal(engine.lesson('synthetic-physics','oscillation').stage,'not_started');
+  assert.equal(engine.advanceLesson('s','synthetic-physics','oscillation','concept','t1').stage,'concept');
+  assert.equal(exposures(),1);
+  assert.equal(engine.advanceLesson('s','synthetic-physics','oscillation','concept','t2').stage,'concept');
+  assert.equal(exposures(),1,'repeating the current stage must not append a record');
+  assert.throws(()=>engine.advanceLesson('s','synthetic-physics','oscillation','modeling','t3'),/current stage is concept.*next allowed stage is mathematical_modeling/s);
+  assert.throws(()=>engine.advanceLesson('s','synthetic-physics','oscillation','derivation','t4'),/next allowed stage is mathematical_modeling/);
+  const topic=engine.state().courses.find(c=>c.courseId==='synthetic-physics')?.topics.find(x=>x.topicId==='oscillation');
+  assert.equal(topic?.lesson.stage,'concept');
+  assert.equal((topic?.lesson as {nextStage?:string}).nextStage,'mathematical_modeling');
+});
+
+test('TOOLS-01: a course without a plan names where the planned courses are listed',async t=>{
+  const {engine}=await fixture();t.after(()=>engine.close());
+  assert.throws(()=>engine.plan('synthetic-physics'),/No course plan for synthetic-physics.*study_get_state\.plans.*none/s);
 });

@@ -17,7 +17,7 @@
  * between "TypeScript compiles" and "the shipped artifact does something".
  */
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -38,7 +38,7 @@ interface FakeToolDefinition {
     render(args: unknown, value: unknown): readonly { type: string; text: string }[]
     presentationMeta(args: unknown, value: unknown): unknown
   }
-  execute(args: unknown, exec: { signal: AbortSignal }): Promise<unknown>
+  execute(args: unknown, exec: { signal: AbortSignal; agent?: { id: string } }): Promise<unknown>
 }
 
 interface FakeCommandDefinition {
@@ -175,8 +175,8 @@ test('built host bundle: exports a plugin and registers tool + command under eff
   const dir = mkdtempSync(join(tmpdir(), 'dsh-rich-response-'))
   try {
     const fake = fakeHostContext()
-    mod.apply(fake.ctx, { auditLog: join(dir, 'audit.jsonl'), maxTrackedAttempts: 8 })
-    assert.equal(fake.disposers.length, 6)
+    mod.apply(fake.ctx, { auditLog: join(dir, 'audit.jsonl'), maxTrackedAttempts: 8, figuresDir: join(dir, 'figures') })
+    assert.equal(fake.disposers.length, 7)
     const tool = fake.tool()
     assert.equal(tool.name, 'rich_render')
     const physics = fake.tool('rich_physics_demo')
@@ -188,6 +188,13 @@ test('built host bundle: exports a plugin and registers tool + command under eff
     const heatmap = fake.tool('rich_heatmap')
     const grid = await heatmap.execute({ content: { schemaVersion: 1, title: 'grid', values: [[0, 1], [2, 3]] } }, { signal: new AbortController().signal })
     assert.equal((heatmap.output.presentationMeta({}, grid) as { kind: string }).kind, 'rich-heatmap')
+    // VIS-03: figure tools write under the configured directory and hand back the inline line.
+    const figure = (grid as { figure?: { path: string } }).figure
+    assert.ok(figure !== undefined && figure.path.startsWith(join(dir, 'figures')) && existsSync(figure.path))
+    const drawing = fake.tool('rich_svg')
+    const sketch = await drawing.execute({ title: 'sketch', svg: '<svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="4"/></svg>' }, { signal: new AbortController().signal, agent: { id: 's1' } })
+    assert.equal((drawing.output.presentationMeta({}, sketch) as { kind: string }).kind, 'rich-svg')
+    assert.match(drawing.output.render({}, sketch).map(part => part.text).join(''), /\n!\[sketch\]\(/)
     // Model-facing schema must be raw JSON Schema, not the author-side DSL.
     assert.equal(tool.parameters['type'], 'object')
     assert.equal((tool.parameters['required'] as string[])[0], 'content')
@@ -273,7 +280,7 @@ test('built client bundle: module-table handoff, React-only externals, registers
   assert.equal(typeof exports.apply, 'function')
 
   const client = applyClientPlugin(exports as { apply(ctx: unknown): void })
-  assert.equal(client.registrations.length, 5)
+  assert.equal(client.registrations.length, 6)
   assert.equal(client.registrations[0]?.name, 'tool.call.toolview')
   assert.equal(client.registrations[0]?.key, 'rich_render')
   assert.equal(client.registrations[1]?.name, 'tool.call.toolview')
@@ -281,6 +288,7 @@ test('built client bundle: module-table handoff, React-only externals, registers
   assert.equal(client.registrations[2]?.key, 'rich_mermaid')
   assert.equal(client.registrations[3]?.key, 'rich_heatmap')
   assert.equal(client.registrations[4]?.key, 'rich_image')
+  assert.equal(client.registrations[5]?.key, 'rich_svg')
   assert.notEqual(client.registrations[2]?.component, client.registrations[0]?.component)
   const ToolView = client.registrations[0]?.component
 
@@ -306,6 +314,11 @@ test('built client bundle: module-table handoff, React-only externals, registers
   assert.match(markup, /data-dsh-rich-status="ok"/)
   assert.match(markup, /data-dsh-rich-session="session-abc"/)
   assert.match(markup, /Sine Function|line-plot-scaffold/)
+  // UI-01: DSH alias tokens and a Chinese type label; no internal ids or schema versions in visible text.
+  assert.match(markup, /--dsw-alias-border-l2/)
+  assert.doesNotMatch(markup, /--dsw-color-/)
+  assert.match(markup, />函数图像</)
+  assert.doesNotMatch(markup.replace(/<[^>]*>/g, ' '), /call-1|line_plot \| v1|Rich response/)
 
   const failed = renderToolView(ToolView, {
     sessionId: 'session-abc',
@@ -346,7 +359,7 @@ test('built client bundle: module-table handoff, React-only externals, registers
     },
   })
   assert.match(unsupported, /data-dsh-rich="unsupported-version"/)
-  assert.match(unsupported, /unsupported rich content version 7/)
+  assert.match(unsupported, /不支持的图形内容版本 7/)
 
   // A tampered persisted envelope version must never render even when the
   // content itself would validate (the envelope reader is authoritative).
@@ -390,7 +403,7 @@ test('built client bundle: preparing and start stages render bounded states', ()
     block: { phase: 'preparing', callId: 'c', name: 'rich_render', turn: 1, step: 1, time: 1, args: {}, subCalls: [] },
   })
   assert.match(preparing, /data-dsh-rich-phase="preparing"/)
-  assert.match(preparing, /preparing rich content/)
+  assert.match(preparing, /正在准备图形/)
 
   const start = renderToolView(ToolView, {
     sessionId: 's',
@@ -403,5 +416,29 @@ test('built client bundle: preparing and start stages render bounded states', ()
     },
   })
   assert.match(start, /data-dsh-rich-phase="start"/)
-  assert.match(start, /live preview/)
+  assert.match(start, /实时预览/)
+})
+
+test('built client bundle: rich_svg shows the rebuilt card only through an image', () => {
+  const registration = loadClientBundle()
+  const exports = registration.factory(specifier => {
+    if (specifier === 'react') return React
+    if (specifier === 'react/jsx-runtime') return JsxRuntime
+    throw new Error('unexpected module request: ' + specifier)
+  }) as { apply(ctx: unknown): void }
+  const SvgView = applyClientPlugin(exports).registrations[5]?.component
+  const card = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" width="10" height="10"><circle cx="5" cy="5" r="4"/></svg>'
+  const block = (meta: unknown) => ({
+    kind: 'tool-result', seq: 1, time: 1, callId: 'c', name: 'rich_svg', content: [{ type: 'text', text: 'Drew' }],
+    isError: false, meta, call: null, subCalls: [],
+  })
+  const shown = renderToolView(SvgView, { sessionId: 's', callId: 'c', toolName: 'rich_svg', phase: 'result', block: block({ kind: 'rich-svg', envelopeVersion: 1, title: 'sketch', svg: card }) })
+  assert.match(shown, /data-dsh-rich="svg-image"/)
+  assert.match(shown, /src="data:image\/svg\+xml;charset=utf-8,%3Csvg/)
+  assert.ok(!shown.includes('<circle'), 'SVG markup never enters the DOM')
+  const forged = renderToolView(SvgView, { sessionId: 's', callId: 'c', toolName: 'rich_svg', phase: 'result', block: block({ kind: 'rich-svg', envelopeVersion: 1, title: 'x', svg: '<svg onload="x()"></svg>' }) })
+  assert.match(forged, /data-dsh-rich="svg-invalid"/)
+  // Review R3: an unpaired surrogate would make encodeURIComponent throw during render.
+  const surrogate = renderToolView(SvgView, { sessionId: 's', callId: 'c', toolName: 'rich_svg', phase: 'result', block: block({ kind: 'rich-svg', envelopeVersion: 1, title: 'x', svg: card.replace('</svg>', '<text>\ud800</text></svg>') }) })
+  assert.match(surrogate, /data-dsh-rich="svg-invalid"/)
 })

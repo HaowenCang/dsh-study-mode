@@ -1,5 +1,6 @@
 node_modules/
 .tmp/
+core/lib/
 rich/lib/
 rich/.tmp/
 *.log

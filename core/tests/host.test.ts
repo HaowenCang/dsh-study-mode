@@ -69,3 +69,14 @@ test('storage follows DSH home resolution: unset or blank DSH_HOME means ~/.dsh,
   process.env.DSH_HOME='relative-home';
   assert.throws(()=>apply(ctx as any,{}),/absolute/i);
 });
+
+test('TOOLS-01: teaching-step schema lists the stages and the plan tool points at study_get_state.plans',async t=>{
+  const {engine}=await fixture();t.after(()=>engine.close());
+  const {registerApi}=await import('../src/host/api.ts');
+  const tools:any[]=[];
+  registerApi({tools:{register:(d:unknown)=>{tools.push(d);return()=>{};}},commands:{register:()=>()=>{}},effect:(f:()=>undefined|(()=>void))=>{f();}},engine,false);
+  const step=tools.find(d=>d.name==='study_teaching_step');
+  assert.deepEqual(step.parameters.properties.stage.enum,['concept','mathematical_modeling','derivation','worked_examples','guided_practice','independent_assessment','review_and_consolidation']);
+  assert.match(step.description,/concept.*mathematical_modeling/s);
+  assert.match(tools.find(d=>d.name==='study_get_plan').description,/study_get_state.*plans/);
+});

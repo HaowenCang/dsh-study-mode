@@ -1,7 +1,8 @@
 /**
- * Run every suite: Study Core (Node test runner on TypeScript sources), Rich
- * Response (its own bundling unit runner, which needs rich/lib built first) and
- * the package contract against the committed lib/.
+ * Run every suite: Study Core (Node test runner on TypeScript sources; its client
+ * test needs core/lib built first), Rich Response (its own bundling unit runner,
+ * which needs rich/lib built first) and the package contract against the
+ * committed lib/.
  */
 import { spawnSync } from 'node:child_process'
 import { join, resolve } from 'node:path'
@@ -9,6 +10,7 @@ import { fileURLToPath } from 'node:url'
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const steps = [
+  ['core build', join(root, 'core'), [join('scripts', 'build.mjs')]],
   ['core', join(root, 'core'), ['--test', 'tests/*.test.ts']],
   ['rich build', root, [join('rich', 'scripts', 'build.mjs')]],
   ['rich', root, [join('rich', 'scripts', 'run-unit-tests.mjs')]],

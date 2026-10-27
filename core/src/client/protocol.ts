@@ -34,8 +34,18 @@ export function commandSummary(outcome:{kind:string;text?:string}|null,sessionId
   try{
     const a=readAttempt(JSON.parse(outcome.text??'null'),sessionId);
     if(!a)return '学习记录不可用，请刷新题卡。';
-    if(a.grade)return '作答已记录：'+(a.grade.outcome==='correct'?'正确':a.grade.outcome==='incorrect'?'待纠正':'待人工复核')+'；帮助等级 '+a.maxHelp+'。';
+    if(a.grade)return '作答已记录：'+(OUTCOME_LABELS[a.grade.outcome]??a.grade.outcome)+'；帮助等级 '+a.maxHelp+'。';
     if(a.hintText)return '已记录 '+a.maxHelp+' 提示，本次作答不再计为独立测评。';
     return '学习记录已同步。';
   }catch{return '学习记录不可用，请刷新题卡。';}
+}
+const OUTCOME_LABELS:Record<string,string>={correct:'回答正确',incorrect:'需要纠正',pending_review:'待人工复核'};
+/** Chinese wording of the deterministic grading bases; a human reviewer's reason is shown as written. */
+const BASIS_LABELS:Record<string,string>={
+  'Exact option set against Host answer key.':'按 Host 答案键比对选项',
+  'Host answer key, exact unit and configured absolute/relative tolerance.':'按 Host 答案键比对数值、单位与容差',
+  'Open work requires human review of reasoning and applicability.':'开放题需人工复核推理与适用条件',
+};
+export function gradeLabel(grade:{outcome:string;basis:string}):string{
+  return (OUTCOME_LABELS[grade.outcome]??grade.outcome)+' · '+(BASIS_LABELS[grade.basis]??grade.basis);
 }
