@@ -13,6 +13,8 @@ import type { RendererTheme, RichRendererProps } from './types'
 import { formatCoordinate } from './chart/scale'
 import {
   DIAGRAM_EDGE_LABEL_UNITS,
+  DIAGRAM_FONT,
+  DIAGRAM_MIN_RENDER_WIDTH,
   DIAGRAM_VIEW,
   buildDiagramGeometry,
   toneStyle,
@@ -104,7 +106,7 @@ function NodeShape({ geometry, theme }: { readonly geometry: DiagramNodeGeometry
         y={formatCoordinate(center.y)}
         dy="0.34em"
         textAnchor="middle"
-        fontSize={12}
+        fontSize={DIAGRAM_FONT.node}
         fill={tone.text}
       >
         {truncateLabel(label, geometry.labelMaxChars)}
@@ -139,72 +141,81 @@ export function BasicDiagram({ content, theme }: RichRendererProps<BasicDiagramC
           No diagram nodes to draw.
         </div>
       ) : (
-        <svg
-          data-dsh-rich-svg="basic-diagram"
-          role="img"
-          aria-label={diagramAriaLabel(content)}
-          viewBox={`0 0 ${String(DIAGRAM_VIEW.width)} ${String(DIAGRAM_VIEW.height)}`}
-          style={{ width: '100%', height: 'auto', display: 'block' }}
+        // Narrow cards scroll horizontally rather than shrinking the labels (VIS-02).
+        <div
+          data-dsh-rich="diagram-scroll"
+          role="region"
+          aria-label={`Diagram ${content.title}, scroll horizontally when narrow`}
+          tabIndex={0}
+          style={{ overflowX: 'auto', maxWidth: '100%' }}
         >
-          <defs>
-            <marker
-              id={arrowId}
-              viewBox="0 0 10 7"
-              markerWidth={10}
-              markerHeight={7}
-              refX={10}
-              refY={3.5}
-              orient="auto"
-              markerUnits="userSpaceOnUse"
-            >
-              <path d="M0,0 L10,3.5 L0,7 Z" fill={theme.muted} />
-            </marker>
-          </defs>
-          <g data-dsh-rich="edges" data-dsh-rich-edge-count={geometry.edges.length} data-dsh-rich-dropped-edges={geometry.droppedEdges}>
-            {geometry.edges.map((edge, index) => (
-              <g
-                key={`${edge.edge.from}->${edge.edge.to}#${String(index)}`}
-                data-dsh-rich="edge"
-                data-dsh-rich-edge-from={edge.edge.from}
-                data-dsh-rich-edge-to={edge.edge.to}
-                data-dsh-rich-edge-dashed={edge.edge.dashed === true ? 'true' : 'false'}
+          <svg
+            data-dsh-rich-svg="basic-diagram"
+            role="img"
+            aria-label={diagramAriaLabel(content)}
+            viewBox={`0 0 ${String(DIAGRAM_VIEW.width)} ${String(DIAGRAM_VIEW.height)}`}
+            style={{ width: '100%', minWidth: `${String(DIAGRAM_MIN_RENDER_WIDTH)}px`, height: 'auto', display: 'block' }}
+          >
+            <defs>
+              <marker
+                id={arrowId}
+                viewBox="0 0 10 7"
+                markerWidth={10}
+                markerHeight={7}
+                refX={10}
+                refY={3.5}
+                orient="auto"
+                markerUnits="userSpaceOnUse"
               >
-                <line
-                  data-dsh-rich="edge-line"
-                  x1={formatCoordinate(edge.start.x)}
-                  y1={formatCoordinate(edge.start.y)}
-                  x2={formatCoordinate(edge.end.x)}
-                  y2={formatCoordinate(edge.end.y)}
-                  stroke={theme.muted}
-                  strokeWidth={1.3}
-                  strokeDasharray={edge.edge.dashed === true ? '7 5' : undefined}
-                  markerEnd={`url(#${arrowId})`}
-                />
-                {edge.labelText.length > 0 ? (
-                  <text
-                    data-dsh-rich="edge-label"
-                    x={formatCoordinate(edge.label.x)}
-                    y={formatCoordinate(edge.label.y)}
-                    textAnchor="middle"
-                    fontSize={11}
-                    fill={theme.muted}
-                    stroke={theme.surface}
-                    strokeWidth={3}
-                    paintOrder="stroke"
-                  >
-                    <title>{edge.labelText}</title>
-                    {truncateLabel(edge.labelText, DIAGRAM_EDGE_LABEL_UNITS)}
-                  </text>
-                ) : null}
-              </g>
-            ))}
-          </g>
-          <g data-dsh-rich="nodes" data-dsh-rich-node-count={geometry.nodes.length}>
-            {geometry.nodes.map(node => (
-              <NodeShape key={node.node.id} geometry={node} theme={theme} />
-            ))}
-          </g>
-        </svg>
+                <path d="M0,0 L10,3.5 L0,7 Z" fill={theme.muted} />
+              </marker>
+            </defs>
+            <g data-dsh-rich="edges" data-dsh-rich-edge-count={geometry.edges.length} data-dsh-rich-dropped-edges={geometry.droppedEdges}>
+              {geometry.edges.map((edge, index) => (
+                <g
+                  key={`${edge.edge.from}->${edge.edge.to}#${String(index)}`}
+                  data-dsh-rich="edge"
+                  data-dsh-rich-edge-from={edge.edge.from}
+                  data-dsh-rich-edge-to={edge.edge.to}
+                  data-dsh-rich-edge-dashed={edge.edge.dashed === true ? 'true' : 'false'}
+                >
+                  <line
+                    data-dsh-rich="edge-line"
+                    x1={formatCoordinate(edge.start.x)}
+                    y1={formatCoordinate(edge.start.y)}
+                    x2={formatCoordinate(edge.end.x)}
+                    y2={formatCoordinate(edge.end.y)}
+                    stroke={theme.muted}
+                    strokeWidth={1.3}
+                    strokeDasharray={edge.edge.dashed === true ? '7 5' : undefined}
+                    markerEnd={`url(#${arrowId})`}
+                  />
+                  {edge.labelText.length > 0 ? (
+                    <text
+                      data-dsh-rich="edge-label"
+                      x={formatCoordinate(edge.label.x)}
+                      y={formatCoordinate(edge.label.y)}
+                      textAnchor="middle"
+                      fontSize={DIAGRAM_FONT.edge}
+                      fill={theme.muted}
+                      stroke={theme.surface}
+                      strokeWidth={3}
+                      paintOrder="stroke"
+                    >
+                      <title>{edge.labelText}</title>
+                      {truncateLabel(edge.labelText, DIAGRAM_EDGE_LABEL_UNITS)}
+                    </text>
+                  ) : null}
+                </g>
+              ))}
+            </g>
+            <g data-dsh-rich="nodes" data-dsh-rich-node-count={geometry.nodes.length}>
+              {geometry.nodes.map(node => (
+                <NodeShape key={node.node.id} geometry={node} theme={theme} />
+              ))}
+            </g>
+          </svg>
+        </div>
       )}
     </div>
   )

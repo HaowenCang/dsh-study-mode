@@ -317,7 +317,7 @@ describe('client registration', () => {
       logger: { info() {}, warn() {}, error() {}, debug() {} },
     } as unknown as ClientContext
     apply(ctx)
-    assert.deepEqual(keys, ['rich_render', 'rich_physics_demo', 'rich_mermaid'])
+    assert.deepEqual(keys, ['rich_render', 'rich_physics_demo', 'rich_mermaid', 'rich_heatmap', 'rich_image'])
     assert.notEqual(components[2], components[0])
   })
 })

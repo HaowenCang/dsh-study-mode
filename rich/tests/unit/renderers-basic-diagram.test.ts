@@ -85,7 +85,8 @@ test('diagram: directed edges carry arrow markers, labels and dashed styling', (
 
 test('diagram: accessible label summarises nodes and edges', () => {
   const markup = render(diagram)
-  const aria = /aria-label="([^"]*)"/.exec(markup)
+  // The SVG's own label; the scroll region around it has a separate one.
+  const aria = /<svg [^>]*aria-label="([^"]*)"/.exec(markup)
   assert.ok(aria !== null)
   assert.match(aria[1] as string, /Diagram Release flow/)
   assert.match(aria[1] as string, /4 nodes, 3 edges/)
@@ -171,4 +172,19 @@ test('basic diagram: wide CJK labels are truncated by display width, not code un
   })
   assert.match(markup, />一个非常长的标签\.\.\.<\/text>/)
   assert.match(markup, /<title>一个非常长的标签用于检查截断与完整标题保留效果<\/title>/)
+})
+
+test('basic diagram: narrow cards scroll instead of shrinking text below the desktop size (VIS-02)', async () => {
+  const { DIAGRAM_FONT, DIAGRAM_MIN_RENDER_WIDTH, DIAGRAM_VIEW } = await import('../../src/client/renderers/diagram/geometry')
+  // At the minimum width node labels render at 8 px or more and edge labels at about 7.5 px.
+  assert.ok((DIAGRAM_FONT.node * DIAGRAM_MIN_RENDER_WIDTH) / DIAGRAM_VIEW.width >= 8)
+  assert.ok((DIAGRAM_FONT.edge * DIAGRAM_MIN_RENDER_WIDTH) / DIAGRAM_VIEW.width >= 7.4)
+  // A normal ~700 px desktop column still fits without scrolling.
+  assert.ok(DIAGRAM_MIN_RENDER_WIDTH <= 700)
+  const markup = render(diagram)
+  // The SVG keeps the minimum width inside a keyboard-focusable horizontal scroll region.
+  assert.match(markup, /<div data-dsh-rich="diagram-scroll" role="region" aria-label="Diagram Release flow, scroll horizontally when narrow" tabindex="0" style="overflow-x:auto;max-width:100%"><svg /)
+  assert.match(markup, /<svg [^>]*style="width:100%;min-width:680px;height:auto;display:block"/)
+  assert.match(markup, /data-dsh-rich="node-label"[^>]*font-size="12"/)
+  assert.match(markup, /data-dsh-rich="edge-label"[^>]*font-size="11"/)
 })

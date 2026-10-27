@@ -14,6 +14,8 @@ import { createRichInteractionCommand } from './tools/rich-interaction'
 import { createRichRenderTool } from './tools/rich-render'
 import { createPhysicsTool } from './tools/physics-demo'
 import { createMermaidTool } from './tools/rich-mermaid'
+import { createHeatmapTool } from './tools/rich-heatmap'
+import { createImageTool, type ImageToolServices } from './tools/rich-image'
 import type { HostConfig, HostContext } from './types'
 
 export const name = 'dsh-rich-response'
@@ -31,6 +33,15 @@ export function apply(ctx: HostContext, config?: HostConfig): void {
   ctx.effect(() => ctx.tools.register(createRichRenderTool()))
   ctx.effect(() => ctx.tools.register(createPhysicsTool()))
   ctx.effect(() => ctx.tools.register(createMermaidTool()))
+  ctx.effect(() => ctx.tools.register(createHeatmapTool()))
+  const imageTool = createImageTool({
+    services: () => ({
+      fs: ctx.get?.('fs') as ImageToolServices['fs'],
+      workingDirectory: ctx.get?.('workingDirectory') as ImageToolServices['workingDirectory'],
+    }),
+    ...config?.maxImageBytes === undefined ? {} : { maxImageBytes: config.maxImageBytes },
+  })
+  ctx.effect(() => ctx.tools.register(imageTool))
   ctx.effect(() => ctx.commands.register(createRichInteractionCommand({
     logger: ctx.logger,
     tracker,
@@ -38,7 +49,7 @@ export function apply(ctx: HostContext, config?: HostConfig): void {
   })))
 
   ctx.logger.info(
-    'rich-response: host half registered (rich_render, rich_physics_demo, rich_mermaid tools, rich-interaction command, auditLog=%s)',
+    'rich-response: host half registered (rich_render, rich_physics_demo, rich_mermaid, rich_heatmap, rich_image tools, rich-interaction command, auditLog=%s)',
     auditLog ?? '<none>',
   )
 }

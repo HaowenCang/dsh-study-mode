@@ -38,3 +38,28 @@ test('human command rows summarize learning results without dumping internal JSO
   assert.match(summary,/正确/);assert.equal(summary.includes('internal-uuid'),false);assert.equal(summary.includes('attemptId'),false);
   assert.match(protocol.commandSummary({kind:'success',text:'{malformed'},'s'),/不可用/);
 });
+
+test('a recorded submit queues original-session feedback even when the card is already gone',async()=>{
+  assert.ok(existsSync(new URL('../src/client/attempt-command.ts',import.meta.url)),'Card command flow is not separated from the component');
+  const {runAttemptCommand}=await import('../src/client/attempt-command.ts');
+  const attempt={attemptId:'a',sessionId:'s',status:'graded',maxHelp:'H0',independent:true,question:{id:'q',version:1,kind:'single_choice',prompt:'Q',options:[{id:'a',label:'A'},{id:'b',label:'B'}]},grade:{outcome:'correct',basis:'key'}};
+  const prompts:unknown[]=[];
+  const remote={
+    commands:{execute:async(_s:string,line:string)=>line.includes('"operation":"broken"')?{ok:false,error:{message:'refused'}}:{ok:true,value:{result:{kind:'success',text:JSON.stringify(attempt)}}}},
+    session:{prompt:async(request:unknown)=>{prompts.push(request);return {ok:true};}},
+  };
+  // The caller is unmounted before the response arrives and never awaits the feedback outcome.
+  const submitted=await runAttemptCommand(remote,'s','a',{operation:'submit',attemptId:'a',requestId:'r',answer:['a']},'feedback-1');
+  assert.equal(submitted.value.status,'graded');
+  assert.equal(prompts.length,1,'feedback prompt was not queued');
+  assert.equal((prompts[0] as {requestId:string;sessionId:string}).requestId,'feedback-1');
+  assert.equal((prompts[0] as {sessionId:string}).sessionId,'s');
+  const read=await runAttemptCommand(remote,'s','a',{operation:'read',attemptId:'a'},undefined);
+  assert.equal(read.feedback,undefined);assert.equal(prompts.length,1,'a read must not queue feedback');
+  await assert.rejects(runAttemptCommand(remote,'s','a',{operation:'broken',attemptId:'a'},'feedback-2'),/refused/);
+  await assert.rejects(runAttemptCommand(remote,'other-session','a',{operation:'submit',attemptId:'a'},'feedback-3'),/Invalid Host learning state/);
+  assert.equal(prompts.length,1,'failed or foreign results must not queue feedback');
+  const offline={...remote,session:{prompt:async()=>{throw new Error('connection lost');}}};
+  const lost=await runAttemptCommand(offline,'s','a',{operation:'submit',attemptId:'a'},'feedback-4');
+  assert.deepEqual(await lost.feedback,{ok:false});
+});

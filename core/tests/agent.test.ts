@@ -60,3 +60,16 @@ test('Study preset admits the bounded Mermaid flowchart tool and names it in the
   assert.equal(guard!({name:'rich_mermaid',arguments:{title:'t',source:'flowchart TD\nA-->B'}}),undefined);
   assert.match(policy,/rich_mermaid/);
 });
+
+test('Study preset admits the heatmap and workspace image tools and names them in the teaching policy',async()=>{
+  const {configureStudyAgent}=await import('../src/agent/index.ts');
+  let restriction:{deny:string[]}|undefined,guard:((exec:{name:string;arguments:unknown})=>string|undefined)|undefined,policy='';
+  const tools={presentAs:()=>()=>{},schemas:()=>['rich_heatmap','rich_image','read_image','pwsh'].map(name=>({name})),restrict:(filter:{deny:string[]})=>{restriction=filter;return()=>{};},guard:(value:typeof guard)=>{guard=value;return()=>{};}};
+  configureStudyAgent({effect:(f:()=>()=>void)=>{f();},tools,systemPrompt:{getSectionOrder:()=>1,section:(section:{text:string})=>{policy=section.text;return()=>{};}},skills:{register:()=>()=>{}}},'Skill');
+  assert.deepEqual(restriction?.deny,['read_image','pwsh']);
+  assert.equal(guard!({name:'rich_heatmap',arguments:{content:{}}}),undefined);
+  assert.equal(guard!({name:'rich_image',arguments:{path:'a.png',alt:'a',source:'user_provided'}}),undefined);
+  assert.match(policy,/rich_heatmap/);
+  assert.match(policy,/rich_image/);
+  assert.match(policy,/只展示学生明确给出路径的图片文件，不要猜测或遍历文件路径/);
+});

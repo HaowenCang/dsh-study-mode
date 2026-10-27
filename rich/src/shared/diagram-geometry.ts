@@ -14,6 +14,15 @@ import { graphemes, graphemeWidth } from './text-width'
 /** Fixed diagram viewport in SVG user units. */
 export const DIAGRAM_VIEW = { width: 1000, height: 560 } as const
 
+/** Label font sizes in SVG user units; on screen they scale with the drawn width. */
+export const DIAGRAM_FONT = { node: 12, edge: 11 } as const
+
+/**
+ * Smallest on-screen width of the diagram in CSS pixels. Narrower cards scroll
+ * horizontally instead, so node labels never drop below about 8 px (VIS-02).
+ */
+export const DIAGRAM_MIN_RENDER_WIDTH = 680
+
 /** Shape metrics in SVG user units (independent of the 0..1000 model grid). */
 export const DIAGRAM_BOX = { width: 148, height: 60 } as const
 export const DIAGRAM_DIAMOND = { halfWidth: 88, halfHeight: 46 } as const

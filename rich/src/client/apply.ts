@@ -8,6 +8,8 @@
 import type { ClientContext } from './contract'
 import { createToolView } from './toolview'
 import { PhysicsToolView } from './physics-view'
+import { HeatmapToolView } from './heatmap-view'
+import { ImageToolView } from './image-view'
 
 /** Register the Client half through the official slot registry. */
 export function apply(ctx: ClientContext): void {
@@ -26,5 +28,13 @@ export function apply(ctx: ClientContext): void {
     name: 'tool.call.toolview',
     key: 'rich_mermaid',
   }, MermaidToolView))
-  ctx.logger.info('rich-response: client half registered tool.call.toolview keys=rich_render,rich_physics_demo,rich_mermaid')
+  ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({
+    name: 'tool.call.toolview',
+    key: 'rich_heatmap',
+  }, HeatmapToolView))
+  ctx.slots.inject('tool.call.toolview', () => ctx.slots.register({
+    name: 'tool.call.toolview',
+    key: 'rich_image',
+  }, ImageToolView))
+  ctx.logger.info('rich-response: client half registered tool.call.toolview keys=rich_render,rich_physics_demo,rich_mermaid,rich_heatmap,rich_image')
 }

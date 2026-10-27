@@ -176,7 +176,7 @@ test('built host bundle: exports a plugin and registers tool + command under eff
   try {
     const fake = fakeHostContext()
     mod.apply(fake.ctx, { auditLog: join(dir, 'audit.jsonl'), maxTrackedAttempts: 8 })
-    assert.equal(fake.disposers.length, 4)
+    assert.equal(fake.disposers.length, 6)
     const tool = fake.tool()
     assert.equal(tool.name, 'rich_render')
     const physics = fake.tool('rich_physics_demo')
@@ -185,6 +185,9 @@ test('built host bundle: exports a plugin and registers tool + command under eff
     const mermaid = fake.tool('rich_mermaid')
     const flow = await mermaid.execute({ title: 'flow', source: 'flowchart LR\nA[start] --> B{ok}' }, { signal: new AbortController().signal })
     assert.equal((mermaid.output.presentationMeta({}, flow) as { content: { type: string } }).content.type, 'basic_diagram')
+    const heatmap = fake.tool('rich_heatmap')
+    const grid = await heatmap.execute({ content: { schemaVersion: 1, title: 'grid', values: [[0, 1], [2, 3]] } }, { signal: new AbortController().signal })
+    assert.equal((heatmap.output.presentationMeta({}, grid) as { kind: string }).kind, 'rich-heatmap')
     // Model-facing schema must be raw JSON Schema, not the author-side DSL.
     assert.equal(tool.parameters['type'], 'object')
     assert.equal((tool.parameters['required'] as string[])[0], 'content')
@@ -270,12 +273,14 @@ test('built client bundle: module-table handoff, React-only externals, registers
   assert.equal(typeof exports.apply, 'function')
 
   const client = applyClientPlugin(exports as { apply(ctx: unknown): void })
-  assert.equal(client.registrations.length, 3)
+  assert.equal(client.registrations.length, 5)
   assert.equal(client.registrations[0]?.name, 'tool.call.toolview')
   assert.equal(client.registrations[0]?.key, 'rich_render')
   assert.equal(client.registrations[1]?.name, 'tool.call.toolview')
   assert.equal(client.registrations[1]?.key, 'rich_physics_demo')
   assert.equal(client.registrations[2]?.key, 'rich_mermaid')
+  assert.equal(client.registrations[3]?.key, 'rich_heatmap')
+  assert.equal(client.registrations[4]?.key, 'rich_image')
   assert.notEqual(client.registrations[2]?.component, client.registrations[0]?.component)
   const ToolView = client.registrations[0]?.component
 

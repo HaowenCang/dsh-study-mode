@@ -1,6 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
-import {readAttempt,readAttemptMeta,displaySubmittedAnswer,commandSummary,type CardAttempt} from './protocol.ts';
-import {continueTeaching,type SessionRemote} from './continue.ts';
+import {readAttemptMeta,displaySubmittedAnswer,commandSummary,type CardAttempt} from './protocol.ts';
+import {type SessionRemote} from './continue.ts';
+import {runAttemptCommand} from './attempt-command.ts';
 export const name='dsh-study-core';
 export const inject=['slots','remote','remote.commands','remote.session'];
 interface Context {
@@ -19,20 +20,15 @@ export function apply(ctx:Context):void{
       const signature=JSON.stringify({operation,...extra});
       let requestId=requests.current.get(signature);if(!requestId){requestId=crypto.randomUUID();requests.current.set(signature,requestId);}
       const payload=operation==='read'?{operation,attemptId:initial.attemptId}:{operation,attemptId:initial.attemptId,requestId,...extra};
+      const feedbackKey=signature+':feedback';
+      let feedbackId=operation==='submit'?requests.current.get(feedbackKey):undefined;
+      if(operation==='submit'&&!feedbackId){feedbackId=crypto.randomUUID();requests.current.set(feedbackKey,feedbackId);}
       try{
-        const response=await ctx.remote.commands.execute(props.sessionId,'/study-attempt '+JSON.stringify(payload),[]);
+        // The feedback prompt is queued inside runAttemptCommand even if this card unmounts meanwhile.
+        const {value,feedback}=await runAttemptCommand(ctx.remote,props.sessionId,initial.attemptId,payload,feedbackId);
         if(!alive.current||sequence.current!==current)return;
-        if(!response.ok||response.value?.result.kind!=='success')throw new Error(response.value?.result.text??response.error?.message??'Host command failed');
-        const value=readAttempt(JSON.parse(response.value.result.text??'null'),props.sessionId);
-        if(!value||value.attemptId!==initial.attemptId)throw new Error('Invalid Host learning state');
         setAttempt(value);setNotice(value.hintText??(value.grade?`${value.grade.outcome}: ${value.grade.basis}`:''));
-        if(operation==='submit'){
-          const feedbackKey=signature+':feedback';
-          let feedbackId=requests.current.get(feedbackKey);
-          if(!feedbackId){feedbackId=crypto.randomUUID();requests.current.set(feedbackKey,feedbackId);}
-          const feedback=await continueTeaching(ctx.remote.session,props.sessionId,value.attemptId,feedbackId);
-          if(!feedback.ok&&alive.current&&sequence.current===current)setNotice('作答已保存，教学反馈尚未排队；请在当前会话继续。');
-        }
+        if(feedback&&!(await feedback).ok&&alive.current&&sequence.current===current)setNotice('作答已保存，教学反馈尚未排队；请在当前会话继续。');
       }catch(error){if(alive.current&&sequence.current===current)setNotice(error instanceof Error?error.message:'Learning action failed');}
       finally{if(alive.current&&sequence.current===current)setBusy(false);}
     }

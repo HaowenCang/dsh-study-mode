@@ -200,9 +200,40 @@ All are accepted for Phase 1 unless stated otherwise.
 | R5 | Low | A valid-but-tampered payload in the session store can change what a historical card displays. | Accepted: same trust domain as the transcript; structural validation prevents code/markup injection. |
 | R6 | Low | Staleness uses the client-minted `submittedAt`; a heavily skewed client clock causes rejection (availability), and a forged fresh timestamp is accepted. | Accepted: the timestamp only bounds how long a click can be replayed; identity binding is the security control. |
 | R7 | Low | Rendering the maximum allowed chart (8 × 2048 points) is CPU/GPU work on low-end devices. | Mitigated: byte/series/point caps, hit-target caps, and memoized models keep work bounded and predictable. |
-| R8 | Low | A future renderer change could accidentally introduce an unsafe sink (e.g. a payload string used as an href or raw HTML). | Mitigated by review + tests: the client source currently contains no `dangerouslySetInnerHTML`/`innerHTML`/`href`/`src`/`eval`/`new Function`; the renderer contract is "fixed primitives + escaped text only". |
+| R8 | Low | A future renderer change could accidentally introduce an unsafe sink (e.g. a payload string used as an href or raw HTML). | Mitigated by review + tests: the client source contains no `dangerouslySetInnerHTML`/`innerHTML`/`eval`/`new Function`; the only `src` is the `rich_image` `<img>`, whose value is `data:` plus one of four raster media types plus base64 that `readImageMeta` decoded and matched against the recorded header; the only `href` is the local `blob:` URL of an SVG export. |
+| R11 | Medium | `rich_image` bytes are stored in the tool result and therefore in the session log, which `session-log-deepseek` uploads with official DeepSeek API requests (observed with the controlled provider: bytes in `dsh_session_log`, never in model messages). | Documented in the tool description and README; profiles that must not upload images disable that plugin. `maxImageBytes` bounds the cost. |
+| R12 | Low | `rich_image` provenance (`computed` / `user_provided`) is declared by the model. | Accepted: the card labels it as a model declaration; the Host records only facts it checked (format, size, SHA-256). |
+| R13 | Low | A workspace image reaches the browser's image decoder; the Host checks headers and block structure, not the compressed pixel stream. | Accepted: only PNG/JPEG/GIF/WebP are admitted (no SVG or other scriptable formats), bounded in bytes and pixels; every GIF frame must lie inside the logical screen and the summed frame area is bounded by 40 M pixels; decoding untrusted raster images is ordinary browser behaviour. |
+| R14 | Low | The `rich_image` tool value carries the base64 bytes (the envelope is a projection of it), so they are stored twice in the tool result. A `run_code` sub-dispatch would receive that value in model-visible code. | Mitigated: a call with `exec.parent` set (PTC sub-dispatch) is refused before any file access, so in PTC mode only model-direct calls the runtime admits can show images. The double storage is bounded by `maxImageBytes`. |
+| R15 | Low | The file can change between the `lstat`/realpath checks and `readBytes` (a concurrent writer could swap it for a link). | Accepted: the Study preset has no shell or write tool; other presets already give the model a shell with the same reach. The bytes that were read are then checked for format, size and SHA-256. |
 | R9 | Low | Dev-time dependency compromise (esbuild/typescript/@types) could alter build output. | Mitigated by exact version pins and a zero-runtime-dependency artifact; full supply-chain provenance is out of Phase 1 scope. |
 | R10 | Info | `-0` and unknown extra keys are normalized/rejected rather than preserved; not a security issue, documented for interoperability. | Accepted, documented in the protocol. |
+
+## 9a. `rich_heatmap` and `rich_image`
+
+* `rich_heatmap` is a separate HeatmapV1 protocol (`src/shared/heatmap.ts`) with its own
+  `rich-heatmap` envelope: bounded rectangular matrix, finite canonical numbers, closed
+  literals for palette and origin, length pre-scan before any element is read, 256 KiB
+  byte cap. Colors come only from two fixed palettes.
+* `rich_image` is the only tool that reads a file. Before any filesystem access it refuses
+  UNC, device (`\\?\`, `\\.\`) and drive-relative (`C:file`) spellings and any path whose
+  lexical resolution against the session working directory leaves it, so no model-chosen
+  host path is probed (on Windows a UNC probe opens an outbound SMB connection and error
+  texts would reveal what exists). It then passes the normalized absolute path to the
+  session filesystem service, refuses a final symbolic link (`lstat`) and any realpath
+  outside the working directory (`fs.contains`, which also catches a junction or linked
+  parent directory), applies the byte cap before and during the read, admits only
+  PNG/JPEG/GIF/WebP by header and block structure, requires the extension (when present)
+  to agree, reports JPEG sizes after the Exif orientation, and bounds pixels. A `run_code`
+  sub-dispatch is refused (R14). The client re-decodes the persisted base64, re-checks type,
+  byte length and size, and shows the picture only after Web Crypto confirms the recorded
+  SHA-256; a mismatch replaces it with an alert, and a page without Web Crypto labels it
+  unchecked.
+* Learner-visible text of both protocols (titles, labels, units, alt text, captions,
+  provenance notes) is one line of plain text: C0/C1 controls, DEL, U+2028/2029 and the
+  bidirectional mark, embedding, override and isolate characters are refused
+  (`src/shared/plain-text.ts`), so model text cannot forge summary lines, reorder displayed
+  text or make an exported SVG invalid XML.
 
 ## 10. Verification map
 

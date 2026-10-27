@@ -60,7 +60,7 @@ function issue(code: RichValidationCode, path: string, detail: string): RichVali
  * fields that JSON serialization would never produce (such a payload would
  * otherwise serialize as `{}` while validating as a complete card).
  */
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
   try {
     const prototype = Object.getPrototypeOf(value) as unknown

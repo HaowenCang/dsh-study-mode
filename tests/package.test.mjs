@@ -147,7 +147,8 @@ describe('published content', () => {
 
   it('contains no local paths, account ids or private course data', () => {
     const self = fileURLToPath(import.meta.url)
-    const forbidden = [/[A-Za-z]:[\\/](Projects|Users)/, /\\Users\\/, /20659/, /canghaowen/i, /course-plans\.json/, /lzu-\d/, /\u5170\u5dde|\u5170\u5927/]
+    // Generic patterns only; the private assembler also checks account and course identifiers before publishing.
+    const forbidden = [/[A-Za-z]:[\\/](Projects|Users)/, /\\Users\\/, /\/(home|Users)\/[^/\s]+\//, /course-plans\.json/]
     const leaks = []
     const walk = dir => {
       for (const name of readdirSync(dir)) {

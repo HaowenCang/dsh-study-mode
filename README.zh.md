@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-DeepSeek Harness（DSH）的学习模式插件：面向物理、数学和工程的教学 Agent 预设。作答、判分和学习证据由 Host 掌握，而不是由模型决定。插件同时提供经验证的富视觉：函数曲线、统计图、示意图、确定性物理演示，以及受限的 Mermaid 流程图子集。
+DeepSeek Harness（DSH）的学习模式插件：面向物理、数学和工程的教学 Agent 预设。作答、判分和学习证据由 Host 掌握，而不是由模型决定。插件同时提供经验证的富视觉：函数曲线、统计图、示意图、热力图、工作区图片、确定性物理演示，以及受限的 Mermaid 流程图子集。
 
 > **状态：0.1.0 预发布。** 已在 DSH `0.2.1-rc.3` 上，用确定性的模拟模型、真实的 Host 和浏览器进程完成测试。接入真实模型后的教学效果尚未验证。
 
@@ -31,6 +31,8 @@ dsh plugin --profile <profile> add github:HaowenCang/dsh-study-mode#v0.1.0
 | `rich_render` | 渲染经验证的函数曲线、统计图、示意图或消息卡片 |
 | `rich_physics_demo` | 显示可调参数的确定性物理演示（无限深势阱、谐振子、有限 Ising 模型），可导出 SVG |
 | `rich_mermaid` | 用受限的 Mermaid 子集画流程图（见下文） |
+| `rich_heatmap` | 把数值矩阵画成热力图（顺序或发散配色，最多 128 x 128、4,096 格），可导出 SVG |
+| `rich_image` | 把会话工作目录中已有的 PNG、JPEG、GIF 或 WebP 图片展示给学生（见下文） |
 
 **命令**：`/study-mode` 切换教学模式，不清空历史；`/study-attempt` 供作答卡片使用；`/study-review`（人工复核）只在开启 `enableHumanReview` 时注册；`rich-interaction` 把卡片按钮操作记录到原会话。
 
@@ -50,6 +52,12 @@ DSH 聊天里的 ```` ```mermaid ```` 代码块只显示为普通代码。`rich_
 - 标签是纯文本：HTML、实体和 markdown 会被拒绝（平均值写成 ⟨p⟩）。
 - 子集之外的写法，以及连线会穿过节点、标签会被遮挡或重叠、箭头看不见的布局，都会返回带行号的错误，而不是勉强画出来。
 
+## 图片
+
+`rich_image` 只负责展示：学生能看到图片，模型拿不到图片字节。它只读取会话工作目录内的文件（不接受 URL、UNC 或设备路径，也不接受指向目录外的符号链接或目录联接），只接受按文件头和结构核验过的 PNG/JPEG/GIF/WebP，默认不超过 512 KiB（`rich.maxImageBytes`，最多 2 MiB）、单边 8,192 像素、总计 4,000 万像素。浏览器只有在 SHA-256 与 Host 记录一致时才显示图片。不提供生成图片的功能。
+
+图片字节保存在工具结果里，因此也在会话日志中；DSH 的 `session-log-deepseek` 会随官方 DeepSeek API 请求上传这份日志。不想上传的图片请不要展示。
+
 ## 配置
 
 `dsh-study-mode` 这一行从启动环境变量读取以下配置；也可以在 profile 的 `cordis.patch.yml` 里覆盖这一行直接写值（覆盖会替换整个 `config`）。
@@ -61,7 +69,7 @@ DSH 聊天里的 ```` ```mermaid ```` 代码块只显示为普通代码。`rich_
 | `DSH_STUDY_PLANS` | `core.plansPath` | 课程计划定义 JSON（可选） |
 | `DSH_RICH_RESPONSE_AUDIT_LOG` | `rich.auditLog` | 卡片交互的 JSONL 审计日志（可选） |
 
-其他配置：`core.learnerId`（默认 `local-learner`）、`core.enableHumanReview`（默认 `false`）、`rich.maxTrackedAttempts`（默认 `512`）。
+其他配置：`core.learnerId`（默认 `local-learner`）、`core.enableHumanReview`（默认 `false`）、`rich.maxTrackedAttempts`（默认 `512`）、`rich.maxImageBytes`（默认 `524288`）。
 
 **题库**是带版本的题目数组（`id`、`version`、`courseId`、`topicId`、`familyId`、`kind`、`prompt`、选项或期望数值、`answer`、`dimensions`、`coverage`、`hints.H1`…`H4`），示例见 `data/synthetic.json`。**课程计划**是 `{ courseId, title, version, startDate, endDate, evidenceStatus: "not_imported", sources: [{ path, sha256 }], days: [{ day, unit, title, topics, tasks: [{ id, kind, title, minutes }] }] }` 的数组。计划只导入定义，从不导入学生成绩。
 
@@ -88,8 +96,8 @@ npm run verify   # 类型检查、构建 lib/、运行 Study Core、Rich Respons
 
 - 真实模型下的教学行为（教学方法、工具选择、是否遵守 Skill）尚未验证。
 - Mermaid：交叉且都带标签的连线会被拒绝；三层带标签的嵌套判断需要用 `LR`；不支持 subgraph、样式、点击和其他图表类型。
-- 示意图画布比例固定，窗口很窄时文字会变小。
-- 暂不支持图像资产（计算生成、外部或 AI 生成的图片）。
+- 示意图采用固定布局；窗口窄于 680px 时改为横向滚动，而不是把文字缩小。
+- 图片：只支持工作区内的文件；不支持外部 URL，也不提供生成图片。
 
 ## 许可证
 

@@ -25,7 +25,11 @@ export interface ToolDefinitionLike {
     readonly render: (args: unknown, value: never) => readonly { type: 'text'; text: string }[]
     readonly presentationMeta?: (args: unknown, value: never) => unknown
   }
-  readonly execute: (args: unknown, exec: { readonly signal: AbortSignal }) => Promise<unknown>
+  /**
+   * `agent` is the calling Agent (set by the agent loop); only tools that need the session read it.
+   * `parent` is set on a `run_code` sub-dispatch, whose result value reaches model code.
+   */
+  readonly execute: (args: unknown, exec: { readonly signal: AbortSignal; readonly agent?: unknown; readonly parent?: unknown }) => Promise<unknown>
 }
 
 /** One human command definition (subset of `CommandDefinition`). */
@@ -56,6 +60,8 @@ export interface HostContext {
   readonly tools: { register(definition: ToolDefinitionLike): () => void }
   readonly commands: { register(definition: CommandDefinitionLike): () => void }
   readonly logger: HostLogger
+  /** Strict optional-service lookup; `rich_image` reads `fs` and `workingDirectory` through it at call time. */
+  get?(name: string): unknown
 }
 
 /** Profile-patch configuration of the Host half. */
@@ -68,4 +74,6 @@ export interface HostConfig {
   readonly auditLog?: string
   /** Maximum number of retained attempt ids used for duplicate detection (default 512). */
   readonly maxTrackedAttempts?: number
+  /** Per-image byte limit of `rich_image`, an integer from 1024 to 2097152 (default 524288). */
+  readonly maxImageBytes?: number
 }
