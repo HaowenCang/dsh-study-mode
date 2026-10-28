@@ -12,7 +12,7 @@ test('Host exposes no model answer/review/mastery tools and human commands bind 
   const tools:any[]=[],commands:any[]=[],effects:(()=>void)[]=[];
   const ctx={tools:{register:(d:unknown)=>{tools.push(d);return()=>{};}},commands:{register:(d:unknown)=>{commands.push(d);return()=>{};}},effect:(f:()=>undefined|(()=>void))=>{const dispose=f();if(dispose)effects.push(dispose);}};
   registerApi(ctx,engine,false);
-  assert.deepEqual(tools.map(t=>t.name).sort(),['study_get_plan','study_get_state','study_issue_question','study_teaching_step']);
+  assert.deepEqual(tools.map(t=>t.name).sort(),['study_author_question','study_get_plan','study_get_state','study_issue_question','study_model_review','study_teaching_step']);
   assert.equal(commands.some(c=>c.name==='study-review'),false);
   const issue=tools.find(d=>d.name==='study_issue_question');
   const exec={callId:'call-1',agent:{id:'session-a'},signal:new AbortController().signal};
@@ -79,4 +79,26 @@ test('TOOLS-01: teaching-step schema lists the stages and the plan tool points a
   assert.deepEqual(step.parameters.properties.stage.enum,['concept','mathematical_modeling','derivation','worked_examples','guided_practice','independent_assessment','review_and_consolidation']);
   assert.match(step.description,/concept.*mathematical_modeling/s);
   assert.match(tools.find(d=>d.name==='study_get_plan').description,/study_get_state.*plans/);
+});
+
+test('STUDY-02: authoring and model-review tools bind the calling session and show the learning card',async t=>{
+  const {engine}=await fixture();t.after(()=>engine.close());
+  const {registerApi}=await import('../src/host/api.ts');
+  const tools:any[]=[];
+  registerApi({tools:{register:(d:unknown)=>{tools.push(d);return()=>{};}},commands:{register:()=>()=>{}},effect:(f:()=>undefined|(()=>void))=>{f();}},engine,false);
+  const author=tools.find(d=>d.name==='study_author_question'),review=tools.find(d=>d.name==='study_model_review');
+  assert.deepEqual(author.parameters.properties.type.enum,['single_choice','multiple_choice','true_false','fill_blank','open']);
+  assert.match(author.description,/locked/i);assert.match(author.description,/language/i);
+  assert.deepEqual(review.parameters.properties.verdict.enum,['correct','partially_correct','incorrect']);
+  assert.match(review.description,/does not change/i);
+  const exec={callId:'call-author',agent:{id:'session-a'},signal:new AbortController().signal};
+  const input={courseId:'synthetic-physics',topicId:'oscillation',familyId:'f',type:'open',prompt:'推导简谐运动方程。',referenceAnswer:'x\'\' + ω²x = 0',hints:{H1:'a',H2:'b',H3:'c',H4:'d'},dimensions:['derivation']};
+  const card=await author.execute(input,exec);
+  assert.deepEqual(author.output.presentationMeta(input,card),{kind:'study-attempt',version:1,attempt:card});
+  assert.equal(author.output.render(input,card)[0].text.includes('referenceAnswer'),false);
+  engine.submit('session-a',card.attemptId,'mx\'\' = -kx','s1');
+  await assert.rejects(()=>review.execute({attemptId:card.attemptId,verdict:'correct',comment:'好'},{...exec,callId:'r0',agent:{id:'session-b'}}),/session/i);
+  const reviewed=await review.execute({attemptId:card.attemptId,verdict:'incorrect',comment:'缺少 ω 的定义。'},{...exec,callId:'r1'});
+  assert.equal(reviewed.status,'pending_review');assert.equal(reviewed.modelReviews[0].verdict,'incorrect');
+  assert.deepEqual(review.output.presentationMeta({},reviewed),{kind:'study-model-review',version:1,attemptId:card.attemptId,review:reviewed.modelReviews[0]});
 });

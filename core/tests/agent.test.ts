@@ -86,3 +86,15 @@ test('VIS-03: Study preset admits rich_svg and tells the model to place the retu
   assert.match(policy,/原样复制/);
   assert.match(policy,/不要在回答中直接书写 SVG/);
 });
+
+test('STUDY-02: Study preset admits authoring and model review and tells the model how to write questions',async()=>{
+  const {configureStudyAgent}=await import('../src/agent/index.ts');
+  let guard:((exec:{name:string;arguments:unknown})=>string|undefined)|undefined,policy='';
+  const tools={presentAs:()=>()=>{},schemas:()=>['study_author_question','study_model_review'].map(name=>({name})),restrict:()=>()=>{},guard:(value:typeof guard)=>{guard=value;return()=>{};}};
+  configureStudyAgent({effect:(f:()=>()=>void)=>{f();},tools,systemPrompt:{getSectionOrder:()=>1,section:(section:{text:string})=>{policy=section.text;return()=>{};}},skills:{register:()=>()=>{}}},'Skill');
+  assert.equal(guard!({name:'study_author_question',arguments:{}}),undefined);
+  assert.equal(guard!({name:'study_model_review',arguments:{}}),undefined);
+  assert.match(policy,/study_author_question/);assert.match(policy,/学生使用的语言/);
+  assert.match(policy,/锁定/);assert.match(policy,/study_model_review/);assert.match(policy,/不改变判分/);
+  assert.match(policy,/不要在回答正文里公布答案/);
+});

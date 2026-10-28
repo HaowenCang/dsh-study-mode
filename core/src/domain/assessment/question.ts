@@ -3,12 +3,18 @@ export const dimensions=['concept','modeling','derivation','calculation','transf
 export type Dimension=typeof dimensions[number];
 export const helps=['H0','H1','H2','H3','H4'] as const;
 export type Help=typeof helps[number];
+/** One fill-in blank: accepted texts, or a number within an absolute tolerance. */
+/** Prompt identity used to treat a copied prompt as the same item (D-015): NFKC, whitespace removed. */
+export const promptKey=(prompt:string)=>prompt.normalize('NFKC').replace(/\s+/g,'');
+export interface Blank {accepted?:string[]; value?:number; tolerance?:number; unit?:string}
 export interface Question {
   id:string; version:number; courseId:string; topicId:string; familyId:string;
-  kind:'single_choice'|'multiple_choice'|'numeric'|'open'; prompt:string;
+  kind:'single_choice'|'multiple_choice'|'numeric'|'open'|'fill_blank'; prompt:string;
   options?:{id:string;label:string}[]; answer?:string[]|number; unit?:string;
   absoluteTolerance?:number; relativeTolerance?:number;
   dimensions:Dimension[]; coverage:'final_answer_only'|'steps'; hints:Partial<Record<Help,string>>;
+  /** Model-authored revisions (D-015) only; catalog questions carry none of these. */
+  source?:'model'; sessionId?:string; authoredAt?:string; format?:'true_false'; blanks?:Blank[]; referenceAnswer?:string;
 }
 export function parseCatalog(value:unknown):Question[]{
   if(!Array.isArray(value)||value.length===0||value.length>10000) throw new Error('Invalid question catalog');
@@ -37,7 +43,9 @@ export function parseCatalog(value:unknown):Question[]{
     return JSON.parse(JSON.stringify(q)) as Question;
   });
 }
-export function publicQuestion(q:Question):Omit<Question,'answer'|'hints'|'absoluteTolerance'|'relativeTolerance'> {
-  const {answer:_a,hints:_h,absoluteTolerance:_at,relativeTolerance:_rt,...result}=q;
-  return result;
+export type PublicQuestion=Omit<Question,'answer'|'hints'|'absoluteTolerance'|'relativeTolerance'|'blanks'|'referenceAnswer'|'sessionId'|'authoredAt'>&{blanks?:{unit?:string}[]};
+/** The learner-visible question: no keys, hints, tolerances, accepted blank texts or reference answer. */
+export function publicQuestion(q:Question):PublicQuestion {
+  const {answer:_a,hints:_h,absoluteTolerance:_at,relativeTolerance:_rt,blanks,referenceAnswer:_r,sessionId:_s,authoredAt:_t,...result}=q;
+  return blanks===undefined?result:{...result,blanks:blanks.map(b=>b.unit===undefined?{}:{unit:b.unit})};
 }

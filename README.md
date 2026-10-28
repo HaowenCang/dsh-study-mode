@@ -4,7 +4,7 @@ English | [中文](README.zh.md)
 
 Study Mode for [DeepSeek Harness](https://github.com/deepseek-ai) (DSH): a teaching agent preset for physics, mathematics and engineering in which the Host, not the model, owns attempts, grading and learning evidence. It also adds validated rich visuals: function plots, charts, diagrams, heatmaps, sanitized SVG drawings, workspace images, deterministic physics demos and a bounded Mermaid flowchart subset. Figures can appear inside the answer, next to the text that discusses them.
 
-> **Status: 0.2.0-preview.1, local preview build.** Tested on DSH `0.2.1-rc.3` with a deterministic mock model provider and real Host and browser processes. Teaching quality and inline-figure placement with a real model have not been verified yet.
+> **Status: 0.2.0-preview.2, local preview build.** Tested on DSH `0.2.1-rc.3` with a deterministic mock model provider and real Host and browser processes. Teaching quality, inline-figure placement and the questions a real model writes have not been verified yet.
 
 ## Install
 
@@ -28,6 +28,8 @@ The built `lib/` is committed, so a Git install runs no build script and needs n
 | `study_get_plan` | Read an imported course plan (a schedule, not completion evidence) |
 | `study_teaching_step` | Record a teaching stage that was actually delivered; never sets mastery |
 | `study_issue_question` | Issue a question from the trusted Host catalog as an answer card |
+| `study_author_question` | Write a question and issue it as an answer card: single choice, multiple choice, true/false, fill-in-blank or short answer / derivation, with H1–H4 hints |
+| `study_model_review` | Comment on a submitted short answer against its reference answer; recorded separately, never a grade |
 | `rich_render` | Render a validated function plot, chart, diagram or message card |
 | `rich_physics_demo` | Show a deterministic, parameterised physics demo (infinite well, oscillator, finite Ising) with SVG export |
 | `rich_mermaid` | Draw a flowchart from a bounded Mermaid subset (see below) |
@@ -42,7 +44,8 @@ The built `lib/` is committed, so a Git install runs no build script and needs n
 - Answers, hints, revealed solutions, grades and reviews are append-only. The model cannot submit a learner answer, perform human review or set mastery through any tool; learners answer on the card themselves.
 - Help is recorded as H0–H4 (problem only → full solution), using the highest help seen for that question. Capability is recorded separately per dimension (concept, modelling, derivation, calculation, transfer) as U untested, N not passed, S solved with hints, P passed independently, R re-passed independently in a new context at least 24 hours later.
 - Objective answers are graded deterministically; open derivations stay pending review without a reliable check.
-- Storage is SQLite in `$DSH_HOME/study-core/study.db` (default `~/.dsh/study-core/study.db`), with hash-chained events, idempotent requests and refusal of unknown future schemas.
+- Model-written questions are labelled “模型出题” on the card. Their answer key, hints and reference answer are locked when the card is issued and are not shown on it; the Host checks the structure but not whether the model's key is right. They count toward capability under the same rules as catalog questions. Fill-in blanks are graded per blank by normalized text or by value within tolerance. The reference answer appears after the learner submits. A model review is shown as “不计入判分” and never changes the grade, the pending human review or any capability level. The answer key is in the model's tool-call arguments, so it is in the session log.
+- Storage is SQLite in `$DSH_HOME/study-core/study.db` (default `~/.dsh/study-core/study.db`), with hash-chained events, idempotent requests and refusal of unknown future schemas. 0.2.0-preview.2 moves the database to schema 3; earlier versions refuse it, so back up `study.db` before upgrading if you may roll back.
 
 ## Bounded Mermaid
 

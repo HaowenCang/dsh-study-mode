@@ -5,7 +5,11 @@ export interface Attempt {
   issuedAt:string; status:'issued'|'graded'|'pending_review'; maxHelp:Help; independent:boolean;
   hints:{level:Help;at:string}[]; revealedAt?:string; submittedAt?:string; answer?:unknown;
   grade?:Grade; review?:{reviewer:string;reason:string;at:string};
+  /** Model opinions on an open answer (D-015); never a grade and never read by capability(). */
+  modelReviews?:ModelReview[];
 }
+export const modelVerdicts=['correct','partially_correct','incorrect'] as const;
+export interface ModelReview {verdict:typeof modelVerdicts[number];comment:string;at:string}
 export type Capability='U'|'N'|'S'|'P'|'R';
 export function capability(a:Attempt,q:Question):Capability {
   if(!a.grade||a.grade.outcome==='pending_review') return 'U';

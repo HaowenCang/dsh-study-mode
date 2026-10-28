@@ -71,6 +71,9 @@
  * Text placeholders: `{{figure:N}}` in a text response is replaced by the N-th Markdown
  * image line (`![alt](path)`, 0-based, in message order) found in the request's tool
  * results, standing in for a model that copies a figure tool's line into its answer.
+ * `{{attempt:N}}` in a tool_use `toolInput` string is replaced by the N-th distinct
+ * `"attemptId"` value (0-based, in message order) found in the request's tool results,
+ * standing in for a model that refers back to a study card it issued.
  *
  * The canned title reply keeps the transcript deterministic even if the
  * first-prompt LLM title provider is mounted: title requests are detected from
@@ -308,6 +311,7 @@ function summarizeBody(body) {
     lastUserText: null,
     toolResultCount: 0,
     figureLines: [],
+    attemptIds: [],
   }
   if (Array.isArray(body?.messages)) {
     for (const message of body.messages) {
@@ -317,6 +321,9 @@ function summarizeBody(body) {
           ? block.content
           : (Array.isArray(block.content) ? block.content : []).map((part) => typeof part?.text === 'string' ? part.text : '').join('\n')
         summary.figureLines.push(...(text.match(/^!\[[^\]\n]*\]\([^\s()]+\)$/gm) ?? []))
+        for (const match of text.matchAll(/"attemptId":"([^"\\]+)"/g)) {
+          if (!summary.attemptIds.includes(match[1])) summary.attemptIds.push(match[1])
+        }
       }
     }
     for (let i = body.messages.length - 1; i >= 0; i -= 1) {
@@ -434,6 +441,13 @@ const server = createServer(async (request, response) => {
     index = selected.index
     if (spec?.kind === 'text' && typeof spec.text === 'string' && spec.text.includes('{{figure:')) {
       spec = { ...spec, text: spec.text.replace(/\{\{figure:(\d+)\}\}/g, (_all, n) => summary.figureLines[Number(n)] ?? '(no figure line ' + n + ')') }
+    }
+    if (spec?.kind === 'tool_use' && JSON.stringify(spec.toolInput ?? '').includes('{{attempt:')) {
+      const fill = (value) => typeof value === 'string'
+        ? value.replace(/\{\{attempt:(\d+)\}\}/g, (_all, n) => summary.attemptIds[Number(n)] ?? 'no-attempt-' + n)
+        : Array.isArray(value) ? value.map(fill)
+          : value !== null && typeof value === 'object' ? Object.fromEntries(Object.entries(value).map(([k, v]) => [k, fill(v)])) : value
+      spec = { ...spec, toolInput: fill(spec.toolInput) }
     }
     record.spec = spec
   }

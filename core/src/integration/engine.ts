@@ -1,8 +1,9 @@
 import {randomUUID} from 'node:crypto';
 import {StudyStore} from '../storage/journal.ts';
-import {parseCatalog,helps,publicQuestion,type Question,type Help} from '../domain/assessment/question.ts';
+import {parseCatalog,helps,publicQuestion,promptKey,type Question,type Help} from '../domain/assessment/question.ts';
 import {gradeAnswer} from '../domain/assessment/grading.ts';
-import {capability,type Attempt} from '../domain/assessment/attempt.ts';
+import {capability,modelVerdicts,type Attempt,type ModelReview} from '../domain/assessment/attempt.ts';
+import {parseAuthoredQuestion} from '../domain/assessment/authored.ts';
 import {lessonView,nextStage,type Lesson} from '../domain/lesson/state.ts';
 import {text} from '../shared/validation.ts';
 import {deriveProgress} from '../domain/evidence/progress.ts';
@@ -39,6 +40,17 @@ export class StudyEngine {
     const a=this.internal(id);if(a.sessionId!==session)throw new Error('Attempt session mismatch');
     if(open&&a.status!=='issued')throw new Error('Attempt is closed/submitted');return a;
   }
+  private readonly promptKeys=new Map<string,string>();
+  /** Revisions are immutable, so a prompt key is computed once per question revision. */
+  private promptKeyOf(a:Pick<Attempt,'questionId'|'questionVersion'>):string{
+    const id=a.questionId+'@'+a.questionVersion;let key=this.promptKeys.get(id);
+    if(key===undefined){key=promptKey((this.store.question(a.questionId,a.questionVersion) as Question).prompt);this.promptKeys.set(id,key);}
+    return key;
+  }
+  /** The same item: the same question, or another one with an identical prompt (a copied or re-authored question). */
+  private sameItem(old:Attempt,a:Pick<Attempt,'questionId'|'questionVersion'>):boolean{
+    return old.questionId===a.questionId||this.promptKeyOf(old)===this.promptKeyOf(a);
+  }
   private allAttempts():Attempt[]{
     const latest=new Map<string,Attempt>();
     for(const e of this.store.events(this.learnerId))if(e.aggregate.startsWith('attempt:'))latest.set(e.aggregate,e.payload as Attempt);
@@ -46,24 +58,53 @@ export class StudyEngine {
   }
   private exposure(a:Attempt,all:readonly Attempt[]=this.allAttempts()):void{
     if(a.status!=='issued')return;
-    for(const old of all)if(old.questionId===a.questionId&&old.attemptId!==a.attemptId){
+    for(const old of all)if(old.attemptId!==a.attemptId&&this.sameItem(old,a)){
       if(helps.indexOf(old.maxHelp)>helps.indexOf(a.maxHelp))a.maxHelp=old.maxHelp;
       if(old.submittedAt||old.maxHelp!=='H0')a.independent=false;
     }
   }
-  private view(a:Attempt,all?:readonly Attempt[]){this.exposure(a,all);const q=this.question(a);return {...a,question:publicQuestion(q),capability:capability(a,q)};}
+  private view(a:Attempt,all?:readonly Attempt[]){
+    this.exposure(a,all);const q=this.question(a);
+    // The reference answer of an open question is shown only once the learner has submitted.
+    return {...a,question:publicQuestion(q),capability:capability(a,q),...a.submittedAt!==undefined&&q.referenceAnswer!==undefined?{referenceAnswer:q.referenceAnswer}:{}};
+  }
+  private knownTopic(courseId:string,topicId:string):boolean{
+    return this.catalog.some(q=>q.courseId===courseId&&q.topicId===topicId)||this.plans.some(p=>p.courseId===courseId&&p.days.some(d=>d.unit===topicId));
+  }
   questions(){return this.catalog.map(publicQuestion);}
   attempt(id:string){return this.view(this.internal(id));}
   issue(sessionId:string,questionId:string,requestId:string){
     return this.transaction(sessionId,requestId,{operation:'issue',questionId},()=>{
       const q=this.catalog.find(q=>q.id===questionId);if(!q)throw new Error('Unknown trusted question');
       let maxHelp:Help='H0';let previouslyAnswered=false;
-      for(const old of this.allAttempts().filter(a=>a.questionId===q.id)){
+      for(const old of this.allAttempts().filter(a=>this.sameItem(a,{questionId:q.id,questionVersion:q.version}))){
         if(helps.indexOf(old.maxHelp)>helps.indexOf(maxHelp))maxHelp=old.maxHelp;
         if(old.submittedAt)previouslyAnswered=true;
       }
       const a:Attempt={attemptId:randomUUID(),learnerId:this.learnerId,sessionId,questionId:q.id,questionVersion:q.version,issuedAt:this.time(),status:'issued',maxHelp,independent:maxHelp==='H0'&&!previouslyAnswered,hints:[]};
       this.append('issued','attempt:'+a.attemptId,sessionId,a);return this.view(a);
+    });
+  }
+  /** Store a model-written question as an immutable revision and issue it, in one transaction (D-015). */
+  author(sessionId:string,input:unknown,requestId:string){
+    return this.transaction(sessionId,requestId,{operation:'author',input},()=>{
+      const q=parseAuthoredQuestion(input,{id:'m-'+randomUUID(),sessionId,time:this.time(),knownTopic:(c,t)=>this.knownTopic(c,t)});
+      this.store.registerQuestion(q.id,q.version,q);
+      const a:Attempt={attemptId:randomUUID(),learnerId:this.learnerId,sessionId,questionId:q.id,questionVersion:q.version,issuedAt:this.time(),status:'issued',maxHelp:'H0',independent:true,hints:[]};
+      this.exposure(a);// A re-authored or copied prompt keeps the help and exposure already recorded for it.
+      this.append('issued','attempt:'+a.attemptId,sessionId,a);return this.view(a);
+    });
+  }
+  /** Append a model opinion on a submitted open answer; the grade, status and capability stay as they are. */
+  modelReview(sessionId:string,attemptId:string,verdict:unknown,comment:unknown,requestId:string){
+    return this.transaction(sessionId,requestId,{operation:'model-review',attemptId,verdict,comment},()=>{
+      if(!modelVerdicts.includes(verdict as ModelReview['verdict']))throw new Error('Invalid model review verdict: use '+modelVerdicts.join(', '));
+      const note=text(comment,'model review comment',4000);
+      const a=this.bound(sessionId,attemptId,false);if(!a.submittedAt)throw new Error('Cannot review an unsubmitted attempt');
+      const q=this.question(a);if(q.kind!=='open'||q.source!=='model')throw new Error('Model review applies only to model-written open (short-answer or derivation) answers, which carry a reference answer');
+      if((a.modelReviews?.length??0)>=20)throw new Error('Model review limit reached for this attempt');
+      a.modelReviews=[...a.modelReviews??[],{verdict:verdict as ModelReview['verdict'],comment:note,at:this.time()}];
+      this.append('model_reviewed','attempt:'+attemptId,sessionId,a);return this.view(a);
     });
   }
   hint(sessionId:string,attemptId:string,level:unknown,requestId:string){
@@ -100,7 +141,7 @@ export class StudyEngine {
   }
   advanceLesson(sessionId:string,courseId:string,topicId:string,stage:unknown,requestId:string){
     return this.transaction(sessionId,requestId,{operation:'teaching',courseId,topicId,stage},()=>{
-      if(!this.catalog.some(q=>q.courseId===courseId&&q.topicId===topicId)&&!this.plans.some(p=>p.courseId===courseId&&p.days.some(d=>d.unit===topicId)))throw new Error('Unknown course/topic');
+      if(!this.knownTopic(courseId,topicId))throw new Error('Unknown course/topic');
       const current=this.lesson(courseId,topicId);
       // Repeating the stage already recorded is a no-op, so a retried call appends nothing.
       if(stage===current.stage)return lessonView(current);

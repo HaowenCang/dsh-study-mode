@@ -12,8 +12,9 @@ export class StudyStore {
     try{
       this.db.exec('PRAGMA busy_timeout=5000; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;');
       const version=this.db.prepare('PRAGMA user_version').get()?.user_version;
-      if(version!==0&&version!==1&&version!==2) throw new Error('Unsupported study database schema version');
+      if(version!==0&&version!==1&&version!==2&&version!==3) throw new Error('Unsupported study database schema version');
       if(version!==0)this.verify();
+      // Version 3 (D-015) adds no table: it fences off model-authored questions and model reviews from older readers.
       this.db.exec(`BEGIN IMMEDIATE;
         CREATE TABLE IF NOT EXISTS questions (id TEXT NOT NULL, version INTEGER NOT NULL, hash TEXT NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(id,version));
         CREATE TABLE IF NOT EXISTS events (seq INTEGER PRIMARY KEY AUTOINCREMENT, id TEXT UNIQUE NOT NULL, learner TEXT NOT NULL, aggregate_id TEXT NOT NULL, kind TEXT NOT NULL, body TEXT NOT NULL, previous_hash TEXT NOT NULL, hash TEXT NOT NULL);
@@ -26,7 +27,7 @@ export class StudyStore {
         CREATE TRIGGER IF NOT EXISTS immutable_questions_delete BEFORE DELETE ON questions BEGIN SELECT RAISE(ABORT,'immutable question revision'); END;
         CREATE TRIGGER IF NOT EXISTS immutable_plans_update BEFORE UPDATE ON course_plans BEGIN SELECT RAISE(ABORT,'immutable course plan'); END;
         CREATE TRIGGER IF NOT EXISTS immutable_plans_delete BEFORE DELETE ON course_plans BEGIN SELECT RAISE(ABORT,'immutable course plan'); END;
-        PRAGMA user_version=2; COMMIT;`);
+        PRAGMA user_version=3; COMMIT;`);
       this.verify();
     }catch(error){this.db.close();throw error;}
   }

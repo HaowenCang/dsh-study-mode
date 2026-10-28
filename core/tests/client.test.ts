@@ -83,7 +83,7 @@ function loadClient():{AttemptView:(props:unknown)=>unknown}{
   return loaded!.factory(id=>{if(id==='react')return React;if(id==='react/jsx-runtime')return JsxRuntime;throw new Error('unexpected module '+id);}) as {AttemptView:(props:unknown)=>unknown};
 }
 /** Expand function components and collect visible text and inline styles. */
-function flatten(node:unknown,out={text:[] as string[],styles:[] as string[],buttons:[] as string[]}){
+function flatten(node:unknown,out={text:[] as string[],styles:[] as string[],buttons:[] as string[],inputs:[] as string[]}){
   if(node===null||node===undefined||typeof node==='boolean')return out;
   if(typeof node==='string'||typeof node==='number'){out.text.push(String(node));return out;}
   if(Array.isArray(node)){for(const child of node)flatten(child,out);return out;}
@@ -91,6 +91,7 @@ function flatten(node:unknown,out={text:[] as string[],styles:[] as string[],but
   if(typeof element.type==='function')return flatten((element.type as (p:unknown)=>unknown)(element.props),out);
   if(element.props.style!==undefined)out.styles.push(JSON.stringify(element.props.style));
   if(element.type==='button')out.buttons.push(flatten(element.props.children).text.join(''));
+  if(element.type==='input'||element.type==='textarea')out.inputs.push(String(element.props['aria-label']??element.props.type));
   return flatten(element.props.children,out);
 }
 
@@ -99,7 +100,7 @@ test('UI-01: built study card uses DSH alias tokens, Chinese status tags and no 
   assert.equal(typeof AttemptView,'function');
   const question={id:'q-visible-id',version:1,kind:'single_choice' as const,prompt:'回复力方向？',options:[{id:'a',label:'指向平衡位置'},{id:'b',label:'背离平衡位置'}]};
   const noop=()=>{};
-  const base={sessionId:'s',busy:false,notice:'',selected:['a'],answer:'',onSelect:noop,onAnswer:noop,onHint:noop,onSubmit:noop,onRefresh:noop};
+  const base={sessionId:'s',busy:false,notice:'',selected:['a'],answer:'',blanks:[],onSelect:noop,onAnswer:noop,onBlank:noop,onHint:noop,onSubmit:noop,onRefresh:noop};
   const issued=flatten(AttemptView({...base,attempt:{attemptId:'6f1c2d3e-uuid',sessionId:'s',status:'issued',maxHelp:'H1',independent:false,question,hintText:'考虑指向平衡位置的方向。'}}));
   const visible=issued.text.join('');
   assert.ok(!visible.includes('q-visible-id')&&!visible.includes('6f1c2d3e'),visible);
@@ -111,4 +112,43 @@ test('UI-01: built study card uses DSH alias tokens, Chinese status tags and no 
   assert.match(graded.text.join(''),/回答正确 · 按 Host 答案键比对选项/);
   assert.match(graded.text.join(''),/指向平衡位置/);
   assert.ok(!graded.buttons.includes('提交作答'));
+});
+
+test('STUDY-02: card protocol accepts model questions, fill-in blanks and model-review envelopes only',async()=>{
+  const {readAttemptMeta,readModelReviewMeta,displaySubmittedAnswer,gradeLabel}=await import('../src/client/protocol.ts');
+  const question={id:'m-1',version:1,kind:'fill_blank',source:'model',prompt:'F = {{1}}，ω = {{2}}。',blanks:[{},{unit:'rad/s'}]};
+  const attempt={attemptId:'a',sessionId:'s',status:'issued',maxHelp:'H0',independent:true,question};
+  assert.equal(readAttemptMeta({kind:'study-attempt',version:1,attempt},'s')?.question.kind,'fill_blank');
+  assert.equal(readAttemptMeta({kind:'study-attempt',version:1,attempt:{...attempt,question:{...question,blanks:'x'}}},'s'),undefined);
+  assert.equal(readAttemptMeta({kind:'study-attempt',version:1,attempt:{...attempt,question:{...question,source:'operator'}}},'s'),undefined);
+  assert.equal(displaySubmittedAnswer({...attempt,status:'graded',answer:['-kx','2']} as never),'（1）-kx；（2）2 rad/s');
+  assert.equal(gradeLabel({outcome:'correct',basis:'Each blank against the model-authored answer key locked at issue: normalized text or number within tolerance.'}),'回答正确 · 按出题时锁定的模型答案逐空比对');
+  assert.equal(gradeLabel({outcome:'incorrect',basis:'Exact option set against the model-authored answer key locked at issue.'}),'需要纠正 · 按出题时锁定的模型答案键比对选项');
+  const review={verdict:'partially_correct',comment:'缺少条件。',at:'2026-10-27T00:00:00.000Z'};
+  assert.deepEqual(readModelReviewMeta({kind:'study-model-review',version:1,attemptId:'a',review}),{attemptId:'a',review});
+  assert.equal(readModelReviewMeta({kind:'study-model-review',version:1,attemptId:'a',review:{...review,verdict:'mastered'}}),undefined);
+});
+
+test('STUDY-02: built card shows the model-question label, inline blanks, next hint level, reference answer and model review',()=>{
+  const {AttemptView}=loadClient();
+  const noop=()=>{};
+  const base={sessionId:'s',busy:false,notice:'',selected:[],answer:'',blanks:['',''],onSelect:noop,onAnswer:noop,onBlank:noop,onHint:noop,onSubmit:noop,onRefresh:noop};
+  const blankQuestion={id:'m-1',version:1,kind:'fill_blank',source:'model',prompt:'回复力 F = {{1}}，角频率 ω = {{2}}。',blanks:[{},{unit:'rad/s'}]};
+  const issued=flatten(AttemptView({...base,attempt:{attemptId:'a',sessionId:'s',status:'issued',maxHelp:'H1',independent:false,hints:[{level:'H1',at:'t'}],question:blankQuestion}}));
+  const text=issued.text.join('');
+  assert.match(text,/模型出题/);assert.match(text,/回复力 F = /);assert.match(text,/rad\/s/);assert.equal(text.includes('{{'),false);
+  assert.deepEqual(issued.inputs,['第 1 空','第 2 空']);
+  assert.ok(issued.buttons.includes('请求提示 H2'),issued.buttons.join('|'));
+  const last=flatten(AttemptView({...base,attempt:{attemptId:'a',sessionId:'s',status:'issued',maxHelp:'H4',independent:false,hints:[{level:'H4',at:'t'}],question:blankQuestion}}));
+  assert.ok(!last.buttons.some(b=>b.startsWith('请求提示')),'no hint beyond H4');
+  const graded=flatten(AttemptView({...base,attempt:{attemptId:'a',sessionId:'s',status:'graded',maxHelp:'H0',independent:true,question:blankQuestion,answer:['-kx','3'],grade:{outcome:'incorrect',basis:'Each blank against the model-authored answer key locked at issue: normalized text or number within tolerance.',parts:[true,false]}}}));
+  assert.match(graded.text.join(''),/第 1 空 正确.*第 2 空 错误/s);
+  const open={id:'m-2',version:1,kind:'open',source:'model',prompt:'推导简谐运动方程。'};
+  const reviewed=flatten(AttemptView({...base,attempt:{attemptId:'b',sessionId:'s',status:'pending_review',maxHelp:'H0',independent:true,question:open,answer:'mx\'\'=-kx',referenceAnswer:'x\'\' + ω²x = 0',grade:{outcome:'pending_review',basis:'Open work requires human review of reasoning and applicability.'},modelReviews:[{verdict:'partially_correct',comment:'缺少 ω 的定义。',at:'t'}]}}));
+  const shown=reviewed.text.join('');
+  assert.match(shown,/参考答案（出题时锁定）/);assert.match(shown,/ω²x = 0/);
+  assert.match(shown,/模型评阅（不计入判分）/);assert.match(shown,/部分正确/);assert.match(shown,/缺少 ω 的定义/);
+  assert.match(shown,/待人工复核/);
+  const tf=flatten(AttemptView({...base,attempt:{attemptId:'c',sessionId:'s',status:'issued',maxHelp:'H0',independent:true,question:{id:'m-3',version:1,kind:'single_choice',format:'true_false',source:'model',prompt:'机械能守恒。',options:[{id:'true',label:'正确'},{id:'false',label:'错误'}]}}}));
+  assert.match(tf.text.join(''),/判断题/);
 });

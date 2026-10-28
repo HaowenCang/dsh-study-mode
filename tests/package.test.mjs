@@ -80,7 +80,7 @@ describe('built entries', () => {
       assert.equal(entry.default, undefined)
       entry.apply(host.ctx, { core: {}, rich: {} })
       assert.deepEqual(host.children, ['dsh-study-core', 'dsh-rich-response'])
-      for (const tool of ['study_get_state', 'study_issue_question', 'rich_render', 'rich_physics_demo', 'rich_mermaid']) assert.ok(host.tools.includes(tool), tool)
+      for (const tool of ['study_get_state', 'study_issue_question', 'study_author_question', 'study_model_review', 'rich_render', 'rich_physics_demo', 'rich_mermaid']) assert.ok(host.tools.includes(tool), tool)
       assert.ok(host.commands.includes('rich-interaction'))
       assert.ok(existsSync(join(home, 'study-core', 'study.db')))
     } finally {
