@@ -1,6 +1,6 @@
 {
   "name": "dsh-study-mode",
-  "version": "0.2.0-preview.2",
+  "version": "0.2.0-preview.3",
   "type": "module",
   "description": "Study Mode for DeepSeek Harness: systematic teaching with Host-owned attempts, trusted grading and append-only learning evidence, plus validated rich visuals, physics demos and bounded Mermaid flowcharts.",
   "license": "MIT",

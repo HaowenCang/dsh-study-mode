@@ -97,4 +97,5 @@ test('STUDY-02: Study preset admits authoring and model review and tells the mod
   assert.match(policy,/study_author_question/);assert.match(policy,/学生使用的语言/);
   assert.match(policy,/锁定/);assert.match(policy,/study_model_review/);assert.match(policy,/不改变判分/);
   assert.match(policy,/不要在回答正文里公布答案/);
+  assert.match(policy,/新建课题/);assert.match(policy,/不要把题目放到无关的课题/);
 });

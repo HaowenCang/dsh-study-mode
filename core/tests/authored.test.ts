@@ -70,7 +70,7 @@ test('STUDY-02: fill-in-blank grades each blank by normalized text or number wit
 test('STUDY-02: authored questions are validated before anything is stored',async t=>{
   const {engine}=await fixture();t.after(()=>engine.close());
   const bad:[unknown,RegExp][]=[
-    [{...single,courseId:'unknown-course'},/course\/topic/i],
+    [{...single,courseId:'Unknown Course!'},/course\/topic/i],
     [{...single,answer:['A','B']},/answer key/i],
     [{...single,answer:['D']},/answer key/i],
     [{...single,options:['only one']},/options/i],
@@ -172,4 +172,35 @@ test('STUDY-02 R7: model review applies only to model-written open questions',as
   const {engine}=await fixture();t.after(()=>engine.close());
   const bank=engine.issue('s','q-open','i');engine.submit('s',bank.attemptId,'F = -kx','s');
   assert.throws(()=>engine.modelReview('s',bank.attemptId,'correct','好','r'),/model-written/i);
+});
+
+// Desktop finding 2026-10-28: a PDE question had to be filed under the only known topic (oscillation).
+test('STUDY-02 topics: the model may name a new course/topic as a short lowercase id; state lists it as model-created',async t=>{
+  const {engine}=await fixture();t.after(()=>engine.close());
+  const pde={...base,courseId:'math',topicId:'laplace-pde',familyId:'laplace-transform',type:'single_choice',prompt:'对 u_t = u_xx 关于 t 作拉普拉斯变换，得到？',options:['关于 x 的常微分方程','代数方程','积分方程'],answer:['A']};
+  const card=engine.author('s',pde,'c1');engine.submit('s',card.attemptId,['B'],'s1');
+  const step=engine.advanceLesson('s','math','laplace-pde','concept','t1');assert.equal(step.stage,'concept');
+  engine.advanceLesson('s','math','fourier-series','concept','t2');
+  const state=engine.state();
+  const math=state.courses.find(c=>c.courseId==='math')!;
+  assert.equal(math.modelCreated,true);
+  assert.deepEqual(math.topics.map(topic=>[topic.topicId,topic.modelCreated]).sort(),[['fourier-series',true],['laplace-pde',true]]);
+  const topic=math.topics.find(topic=>topic.topicId==='laplace-pde')!;
+  assert.equal(topic.evidence.concept.state,'N');assert.deepEqual(topic.evidence.concept.attemptIds,[card.attemptId]);
+  assert.equal(topic.lesson.stage,'concept');
+  const physics=state.courses.find(c=>c.courseId==='synthetic-physics')!;
+  assert.equal(physics.modelCreated,undefined);assert.equal(physics.topics[0]!.modelCreated,undefined);
+  assert.deepEqual(physics.topics[0]!.evidence.concept.attemptIds,[],'PDE evidence must not land on oscillation');
+  // A new topic under a known course is model-created too.
+  engine.author('s',{...pde,courseId:'synthetic-physics',topicId:'damped-oscillation'},'c2');
+  assert.equal(engine.state().courses.find(c=>c.courseId==='synthetic-physics')!.topics.find(topic=>topic.topicId==='damped-oscillation')?.modelCreated,true);
+});
+
+test('STUDY-02 topics: new ids must be short lowercase slugs',async t=>{
+  const {engine}=await fixture();t.after(()=>engine.close());
+  for(const [courseId,topicId] of [['math','Laplace PDE'],['Math','laplace'],['math','../x'],['math','a'.repeat(49)],['math','-pde'],['math','拉普拉斯']]){
+    assert.throws(()=>engine.author('s',{...single,courseId,topicId},'x-'+courseId+topicId),/course\/topic/i,courseId+'/'+topicId);
+    assert.throws(()=>engine.advanceLesson('s',courseId,topicId,'concept','y-'+courseId+topicId),/course\/topic/i,courseId+'/'+topicId);
+  }
+  assert.equal(engine.state().courses.length,1);
 });

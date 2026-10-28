@@ -8,6 +8,9 @@ import {lessonView,nextStage,type Lesson} from '../domain/lesson/state.ts';
 import {text} from '../shared/validation.ts';
 import {deriveProgress} from '../domain/evidence/progress.ts';
 import {courseCatalog} from '../domain/course/catalog.ts';
+/** Id format for a course or topic the model creates (D-015 amendment 2026-10-28). */
+const TOPIC_ID=/^(?=.{1,48}$)[a-z0-9]+(?:-[a-z0-9]+)*$/;
+const UNKNOWN_TOPIC='Unknown course/topic: reuse a courseId and topicId from study_get_state, or name a new one as a short lowercase id (a-z, 0-9 and single hyphens, at most 48 characters)';
 import {teachingMode,type TeachingMode} from '../domain/progress/mode.ts';
 import {parsePlans,type CoursePlan} from '../domain/course/plan.ts';
 
@@ -71,6 +74,10 @@ export class StudyEngine {
   private knownTopic(courseId:string,topicId:string):boolean{
     return this.catalog.some(q=>q.courseId===courseId&&q.topicId===topicId)||this.plans.some(p=>p.courseId===courseId&&p.days.some(d=>d.unit===topicId));
   }
+  /** A catalog or plan topic, or a new one the model names with short lowercase ids (listed as model-created). */
+  private acceptsTopic(courseId:string,topicId:string):boolean{
+    return this.knownTopic(courseId,topicId)||(TOPIC_ID.test(courseId)&&TOPIC_ID.test(topicId));
+  }
   questions(){return this.catalog.map(publicQuestion);}
   attempt(id:string){return this.view(this.internal(id));}
   issue(sessionId:string,questionId:string,requestId:string){
@@ -88,7 +95,7 @@ export class StudyEngine {
   /** Store a model-written question as an immutable revision and issue it, in one transaction (D-015). */
   author(sessionId:string,input:unknown,requestId:string){
     return this.transaction(sessionId,requestId,{operation:'author',input},()=>{
-      const q=parseAuthoredQuestion(input,{id:'m-'+randomUUID(),sessionId,time:this.time(),knownTopic:(c,t)=>this.knownTopic(c,t)});
+      const q=parseAuthoredQuestion(input,{id:'m-'+randomUUID(),sessionId,time:this.time(),acceptsTopic:(c,t)=>this.acceptsTopic(c,t)});
       this.store.registerQuestion(q.id,q.version,q);
       const a:Attempt={attemptId:randomUUID(),learnerId:this.learnerId,sessionId,questionId:q.id,questionVersion:q.version,issuedAt:this.time(),status:'issued',maxHelp:'H0',independent:true,hints:[]};
       this.exposure(a);// A re-authored or copied prompt keeps the help and exposure already recorded for it.
@@ -141,7 +148,7 @@ export class StudyEngine {
   }
   advanceLesson(sessionId:string,courseId:string,topicId:string,stage:unknown,requestId:string){
     return this.transaction(sessionId,requestId,{operation:'teaching',courseId,topicId,stage},()=>{
-      if(!this.knownTopic(courseId,topicId))throw new Error('Unknown course/topic');
+      if(!this.acceptsTopic(courseId,topicId))throw new Error(UNKNOWN_TOPIC);
       const current=this.lesson(courseId,topicId);
       // Repeating the stage already recorded is a no-op, so a retried call appends nothing.
       if(stage===current.stage)return lessonView(current);
@@ -182,7 +189,11 @@ export class StudyEngine {
       for(const day of plan.days)topics.add(day.unit);
       catalog.set(plan.courseId,topics);
     }
-    const courses=[...catalog].map(([courseId,topicIds])=>({courseId,topicIds:[...topicIds],topics:[...topicIds].map(topicId=>({topicId,
+    // Topics the model created through teaching steps or its own questions follow the configured ones.
+    const known=new Map([...catalog].map(([courseId,topics])=>[courseId,new Set(topics)]));
+    const created=[...lessons.values()].map(l=>[l.courseId,l.topicId]).concat(evidence.filter(i=>i.question.source==='model').map(i=>[i.question.courseId,i.question.topicId]));
+    for(const [courseId,topicId] of created){const topics=catalog.get(courseId!)??new Set<string>();topics.add(topicId!);catalog.set(courseId!,topics);}
+    const courses=[...catalog].map(([courseId,topicIds])=>({courseId,...known.has(courseId)?{}:{modelCreated:true as const},topicIds:[...topicIds],topics:[...topicIds].map(topicId=>({topicId,...known.get(courseId)?.has(topicId)?{}:{modelCreated:true as const},
       lesson:lessonView(lessons.get(JSON.stringify([courseId,topicId]))??{courseId,topicId,stage:'not_started',exposureOnly:true}),
       evidence:deriveProgress(evidence.filter(i=>i.question.courseId===courseId&&i.question.topicId===topicId)),
     }))}));

@@ -5,7 +5,7 @@ export const authoredTypes=['single_choice','multiple_choice','true_false','fill
 const COMMON=['courseId','topicId','familyId','type','prompt','hints','dimensions'];
 const SPECIFIC:Record<typeof authoredTypes[number],string[]>={single_choice:['options','answer'],multiple_choice:['options','answer'],true_false:['answer'],fill_blank:['blanks'],open:['referenceAnswer']};
 const LETTERS='ABCDEFGHIJ';
-export interface AuthoringContext {id:string;sessionId:string;time:string;knownTopic:(courseId:string,topicId:string)=>boolean}
+export interface AuthoringContext {id:string;sessionId:string;time:string;acceptsTopic:(courseId:string,topicId:string)=>boolean}
 /**
  * Validate a model-written question and build its immutable revision. Only the
  * structure is checked; whether the answer key is right is the model's claim.
@@ -17,7 +17,7 @@ export function parseAuthoredQuestion(value:unknown,context:AuthoringContext):Qu
   const type=q.type as typeof authoredTypes[number];
   fields(q,[...COMMON,...SPECIFIC[type]]);
   const courseId=text(q.courseId,'course ID'),topicId=text(q.topicId,'topic ID'),familyId=text(q.familyId,'family ID');
-  if(!context.knownTopic(courseId,topicId))throw new Error('Unknown course/topic: use a courseId and topicId from study_get_state');
+  if(!context.acceptsTopic(courseId,topicId))throw new Error('Unknown course/topic: reuse a courseId and topicId from study_get_state, or name a new one as a short lowercase id (a-z, 0-9 and single hyphens, at most 48 characters)');
   const prompt=text(q.prompt,'prompt',4000);
   const hints=record(q.hints);fields(hints,['H1','H2','H3','H4']);
   for(const level of ['H1','H2','H3','H4'])if(typeof hints[level]!=='string'||!String(hints[level]).trim()||String(hints[level]).length>4000)throw new Error('Authored questions need hints H1, H2, H3 and H4 (each 1..4000 characters)');
