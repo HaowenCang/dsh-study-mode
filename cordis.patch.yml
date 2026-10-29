@@ -1,4 +1,4 @@
-# Bundle layer of dsh-study-mode.
+# Bundle layer of dsh-study-tutor (repository dsh-study-mode).
 #
 # One Loader row mounts the Study Core and Rich Response Host plugins: RC.3
 # serves one browser module per package and rejects two active Loader rows that
@@ -6,7 +6,7 @@
 # read at launch; none is derived from model output.
 - insert:
     - id: dsh-study-mode
-      name: dsh-study-mode
+      name: dsh-study-tutor
       config:
         core:
           databasePath: !!js process.env.DSH_STUDY_DATABASE
@@ -27,6 +27,6 @@
         order: 4
         plugins:
           - id: study-agent
-            name: dsh-study-mode/agent
+            name: dsh-study-tutor/agent
           - id: study-skill-loader
             name: '@deepseek-ai/dsh-tool-skill'

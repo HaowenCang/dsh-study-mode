@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url'
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)))
 const outFlag = process.argv.indexOf('--out')
 const outDir = outFlag === -1 ? join(root, 'lib') : resolve(process.argv[outFlag + 1])
-const PACKAGE_NAME = 'dsh-study-mode'
+const PACKAGE_NAME = 'dsh-study-tutor'
 const CLIENT_BANNER = 'window.__ModuleLoader__.load({ id: ' + JSON.stringify(PACKAGE_NAME)
   + ', factory: (require) => { var module = { exports: {} }; var exports = module.exports;'
 const CLIENT_FOOTER = 'return module.exports; } });'

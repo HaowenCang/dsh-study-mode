@@ -1,20 +1,26 @@
-# dsh-study-mode
+# dsh-study-tutor
 
 [English](README.md) | 中文
 
 DeepSeek Harness（DSH）的学习模式插件：面向物理、数学和工程的教学 Agent 预设。作答、判分和学习证据由 Host 掌握，而不是由模型决定。插件同时提供经验证的富视觉：函数曲线、统计图、示意图、热力图、经过净化的 SVG 绘图、工作区图片、确定性物理演示，以及受限的 Mermaid 流程图子集。图可以插在回答正文中，紧挨着讲解它的文字。
 
-> **状态：0.2.0-preview.3，本地预览构建。** 已在 DSH `0.2.1-rc.3` 上，用确定性的模拟模型、真实的 Host 和浏览器进程完成测试。接入真实模型后的教学效果、图的插入位置和模型自己出的题尚未验证。
+> **状态：0.2.0。** 已在 DSH `0.2.1-rc.3` 上用确定性的模拟模型、真实的 Host 和浏览器进程完成测试，并在 DSH 桌面版中接入真实模型使用过（讲授、正文插图、模型出题卡片），没有遗留问题。教学效果和真实模型出题的质量尚无系统评估。
+>
+> npm 包名为 **`dsh-study-tutor`**（npm 上的 `dsh-study-mode` 是另一个无关项目）。本仓库仍叫 `dsh-study-mode`。
 
 ## 安装
 
 需要 DSH `>=0.2.1-rc.3 <0.2.2` 和 Node.js `>=24.13.0`。
 
 ```sh
-dsh plugin --profile <profile> add github:HaowenCang/dsh-study-mode#v0.1.0
+dsh plugin --profile <profile> add dsh-study-tutor
+# 或从 GitHub 固定版本安装：
+dsh plugin --profile <profile> add github:HaowenCang/dsh-study-mode#v0.2.0
 ```
 
-仓库已提交构建好的 `lib/`，从 Git 安装不会运行构建脚本，也不需要在 `allowBuilds` 里放行。请固定标签或提交，避免之后的推送改变你实际运行的代码。打包好的 tarball 也可以这样安装：`dsh plugin --profile <profile> add ./dsh-study-mode-<version>.tgz`。卸载：`dsh plugin --profile <profile> remove dsh-study-mode`。
+**从 0.1.0 或预览版（包名 `dsh-study-mode`）升级：** 先完全退出 DSH 桌面版，执行 `dsh plugin --profile <profile> remove dsh-study-mode`，再添加 `dsh-study-tutor`，然后新建会话。桌面版运行时安装，可能让 Study 预设继续使用旧代码。学习数据仍在 `$DSH_HOME/study-core/study.db`；插件行的 id 仍是 `dsh-study-mode`，已有的 `cordis.patch.yml` 覆盖照样生效。0.2.0 会把数据库升级到 schema 3，0.1.0 无法打开；如果可能回退，请先备份 `study.db`。
+
+仓库已提交构建好的 `lib/`，从 Git 安装不会运行构建脚本，也不需要在 `allowBuilds` 里放行。请固定标签或提交，避免之后的推送改变你实际运行的代码。打包好的 tarball 也可以这样安装：`dsh plugin --profile <profile> add ./dsh-study-tutor-<version>.tgz`。卸载：`dsh plugin --profile <profile> remove dsh-study-tutor`。
 
 ## 提供的功能
 
@@ -45,7 +51,7 @@ dsh plugin --profile <profile> add github:HaowenCang/dsh-study-mode#v0.1.0
 - 帮助强度记为 H0–H4（只有题面 → 完整解答），按该题此前出现过的最高帮助计。能力证据按维度（概念、建模、推导、运算、迁移）分别记录：U 未测，N 未通过，S 提示后完成，P 独立通过，R 至少 24 小时后在新情境中再次独立通过。
 - 客观题确定性判分；没有可靠核验手段的开放推导保持待复核。
 - 模型出的题在卡片上标注“模型出题”。答案键、提示和参考答案在发题时锁定，不显示在卡片上；Host 只检查结构，不检查模型的答案是否正确。这些题与题库题按同样规则计入能力证据。对于没有配置课程或课题的内容，模型会用简短的小写 id 新建课题（如 `math` / `laplace-pde`），`study_get_state` 中标为 `modelCreated`。填空题逐空按规范化文本或容差内的数值判分。学生提交后显示参考答案。模型评阅标注“不计入判分”，不改变判分、待人工复核状态或能力等级。答案键在模型的工具调用参数里，因此会出现在会话记录中。
-- 数据存放在 SQLite：`$DSH_HOME/study-core/study.db`（默认 `~/.dsh/study-core/study.db`），事件哈希链、请求幂等，并拒绝未知的未来版本数据库。0.2.0-preview.2 及以后版本把数据库升级到 schema 3，旧版本会拒绝打开；如果可能回退，升级前先备份 `study.db`。
+- 数据存放在 SQLite：`$DSH_HOME/study-core/study.db`（默认 `~/.dsh/study-core/study.db`），事件哈希链、请求幂等，并拒绝未知的未来版本数据库。0.2.0 会把数据库升级到 schema 3，旧版本会拒绝打开；如果可能回退，升级前先备份 `study.db`。
 
 ## 受限 Mermaid
 

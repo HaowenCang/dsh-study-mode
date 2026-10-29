@@ -32,7 +32,7 @@ function hostContext() {
 
 describe('DSH bundle manifest', () => {
   it('declares an MIT-licensed public bundle for the tested DSH release', () => {
-    assert.equal(pkg.name, 'dsh-study-mode')
+    assert.equal(pkg.name, 'dsh-study-tutor')
     assert.equal(pkg.license, 'MIT')
     assert.equal(pkg.private, undefined)
     assert.equal(pkg.type, 'module')
@@ -40,6 +40,7 @@ describe('DSH bundle manifest', () => {
     assert.deepEqual(pkg.dsh.bundle, { patch: './cordis.patch.yml' })
     assert.equal(pkg.dsh.client.platform, 'web')
     assert.equal(pkg.repository.url, 'git+https://github.com/HaowenCang/dsh-study-mode.git')
+    assert.equal(pkg.version, '0.2.0')
     assert.match(readFileSync(join(root, 'LICENSE'), 'utf8'), /^MIT License/)
   })
 
@@ -62,8 +63,10 @@ describe('DSH bundle manifest', () => {
 
   it('mounts one Loader row for the package plus the Study preset agent row', () => {
     assert.deepEqual([...patch.matchAll(/^\s+name: '?([^'\s]+)'?\s*$/gm)].map(match => match[1]), [
-      'dsh-study-mode', '@deepseek-ai/dsh-agent-preset', 'dsh-study-mode/agent', '@deepseek-ai/dsh-tool-skill',
+      'dsh-study-tutor', '@deepseek-ai/dsh-agent-preset', 'dsh-study-tutor/agent', '@deepseek-ai/dsh-tool-skill',
     ])
+    // The row id stays dsh-study-mode so existing profile overrides of that row keep applying after the npm rename.
+    assert.match(patch, /^    - id: dsh-study-mode$/m)
     assert.doesNotMatch(patch, /dsh-study-core|dsh-rich-response/)
   })
 })
@@ -76,7 +79,7 @@ describe('built entries', () => {
     const host = hostContext()
     try {
       const entry = await import(pathToFileURL(join(root, 'lib', 'index.js')).href)
-      assert.equal(entry.name, 'dsh-study-mode')
+      assert.equal(entry.name, 'dsh-study-tutor')
       assert.equal(entry.default, undefined)
       entry.apply(host.ctx, { core: {}, rich: {} })
       assert.deepEqual(host.children, ['dsh-study-core', 'dsh-rich-response'])
@@ -93,7 +96,7 @@ describe('built entries', () => {
 
   it('the Client entry registers under the package id and mounts both client halves', () => {
     const source = readFileSync(join(root, 'lib', 'client.js'), 'utf8')
-    assert.ok(source.startsWith('window.__ModuleLoader__.load({ id: "dsh-study-mode", factory:'))
+    assert.ok(source.startsWith('window.__ModuleLoader__.load({ id: "dsh-study-tutor", factory:'))
     let registration
     globalThis.window = { __ModuleLoader__: { load(value) { registration = value } } }
     try {
@@ -102,7 +105,7 @@ describe('built entries', () => {
       delete globalThis.window
     }
     const exports = registration.factory(specifier => require(specifier))
-    assert.equal(exports.name, 'dsh-study-mode')
+    assert.equal(exports.name, 'dsh-study-tutor')
     const children = []
     exports.apply({ plugin(child) { children.push(child.name) } })
     assert.deepEqual(children, ['dsh-study-core', 'dsh-rich-response'])

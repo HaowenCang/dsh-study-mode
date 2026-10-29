@@ -1,20 +1,26 @@
-# dsh-study-mode
+# dsh-study-tutor
 
 English | [中文](README.zh.md)
 
 Study Mode for [DeepSeek Harness](https://github.com/deepseek-ai) (DSH): a teaching agent preset for physics, mathematics and engineering in which the Host, not the model, owns attempts, grading and learning evidence. It also adds validated rich visuals: function plots, charts, diagrams, heatmaps, sanitized SVG drawings, workspace images, deterministic physics demos and a bounded Mermaid flowchart subset. Figures can appear inside the answer, next to the text that discusses them.
 
-> **Status: 0.2.0-preview.3, local preview build.** Tested on DSH `0.2.1-rc.3` with a deterministic mock model provider and real Host and browser processes. Teaching quality, inline-figure placement and the questions a real model writes have not been verified yet.
+> **Status: 0.2.0.** Tested on DSH `0.2.1-rc.3` with a deterministic mock model provider and real Host and browser processes, and used in DSH Desktop with a real model (teaching, inline figures, model-written question cards) without open issues. There is no systematic evaluation of teaching quality or of the questions a real model writes.
+>
+> The npm package is **`dsh-study-tutor`** (the name `dsh-study-mode` on npm belongs to an unrelated project). This repository keeps the name `dsh-study-mode`.
 
 ## Install
 
 Requires DSH `>=0.2.1-rc.3 <0.2.2` and Node.js `>=24.13.0`.
 
 ```sh
-dsh plugin --profile <profile> add github:HaowenCang/dsh-study-mode#v0.1.0
+dsh plugin --profile <profile> add dsh-study-tutor
+# or pinned from GitHub:
+dsh plugin --profile <profile> add github:HaowenCang/dsh-study-mode#v0.2.0
 ```
 
-The built `lib/` is committed, so a Git install runs no build script and needs no `allowBuilds` entry. Pin a tag or commit so a later push cannot change what you run. A packed tarball installs the same way: `dsh plugin --profile <profile> add ./dsh-study-mode-<version>.tgz`. Remove it with `dsh plugin --profile <profile> remove dsh-study-mode`.
+**Upgrading from 0.1.0 or a preview (package name `dsh-study-mode`):** quit DSH Desktop completely, run `dsh plugin --profile <profile> remove dsh-study-mode`, then add `dsh-study-tutor`, and start a new session. Installing while Desktop is running can leave the old Study preset code loaded. Learning data stays in `$DSH_HOME/study-core/study.db`, and the bundle row keeps the id `dsh-study-mode`, so existing `cordis.patch.yml` overrides still apply. 0.2.0 moves the database to schema 3, which 0.1.0 refuses: back up `study.db` first if you may go back.
+
+The built `lib/` is committed, so a Git install runs no build script and needs no `allowBuilds` entry. Pin a tag or commit so a later push cannot change what you run. A packed tarball installs the same way: `dsh plugin --profile <profile> add ./dsh-study-tutor-<version>.tgz`. Remove it with `dsh plugin --profile <profile> remove dsh-study-tutor`.
 
 ## What it adds
 
@@ -45,7 +51,7 @@ The built `lib/` is committed, so a Git install runs no build script and needs n
 - Help is recorded as H0–H4 (problem only → full solution), using the highest help seen for that question. Capability is recorded separately per dimension (concept, modelling, derivation, calculation, transfer) as U untested, N not passed, S solved with hints, P passed independently, R re-passed independently in a new context at least 24 hours later.
 - Objective answers are graded deterministically; open derivations stay pending review without a reliable check.
 - Model-written questions are labelled “模型出题” on the card. Their answer key, hints and reference answer are locked when the card is issued and are not shown on it; the Host checks the structure but not whether the model's key is right. They count toward capability under the same rules as catalog questions. For a subject with no configured course or topic, the model creates one with short lowercase ids (for example `math` / `laplace-pde`); `study_get_state` lists it as `modelCreated`. Fill-in blanks are graded per blank by normalized text or by value within tolerance. The reference answer appears after the learner submits. A model review is shown as “不计入判分” and never changes the grade, the pending human review or any capability level. The answer key is in the model's tool-call arguments, so it is in the session log.
-- Storage is SQLite in `$DSH_HOME/study-core/study.db` (default `~/.dsh/study-core/study.db`), with hash-chained events, idempotent requests and refusal of unknown future schemas. 0.2.0-preview.2 and later move the database to schema 3; earlier versions refuse it, so back up `study.db` before upgrading if you may roll back.
+- Storage is SQLite in `$DSH_HOME/study-core/study.db` (default `~/.dsh/study-core/study.db`), with hash-chained events, idempotent requests and refusal of unknown future schemas. 0.2.0 moves the database to schema 3; earlier versions refuse it, so back up `study.db` before upgrading if you may roll back.
 
 ## Bounded Mermaid
 

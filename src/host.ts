@@ -1,5 +1,5 @@
 /**
- * dsh-study-mode Host entry.
+ * dsh-study-tutor Host entry.
  *
  * RC.3 serves one browser module per package and rejects two active Loader rows
  * that resolve to the same package, so this single row mounts the Study Core
@@ -9,7 +9,7 @@
 import * as studyCore from '../core/src/host/index.ts'
 import * as richResponse from '../rich/src/host/index.ts'
 
-export const name = 'dsh-study-mode'
+export const name = 'dsh-study-tutor'
 
 /** Row configuration: each child plugin's own configuration, unchanged. */
 export interface Config {
