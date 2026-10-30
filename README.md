@@ -4,7 +4,7 @@ English | [中文](README.zh.md)
 
 Study Mode for [DeepSeek Harness](https://github.com/deepseek-ai) (DSH): a teaching agent preset for physics, mathematics and engineering in which the Host, not the model, owns attempts, grading and learning evidence. It also adds validated rich visuals: function plots, charts, diagrams, heatmaps, sanitized SVG drawings, workspace images, deterministic physics demos and a bounded Mermaid flowchart subset. Figures can appear inside the answer, next to the text that discusses them.
 
-> **Status: 0.2.0.** Tested on DSH `0.2.1-rc.3` with a deterministic mock model provider and real Host and browser processes, and used in DSH Desktop with a real model (teaching, inline figures, model-written question cards) without open issues. There is no systematic evaluation of teaching quality or of the questions a real model writes.
+> **Status: 0.2.0.** Tested on DSH `0.2.1-rc.3` and `0.2.1-rc.5` with a deterministic mock model provider and real Host and browser processes (on rc.5 also one real-model session), and used in DSH Desktop with a real model (teaching, inline figures, model-written question cards) without open issues. There is no systematic evaluation of teaching quality or of the questions a real model writes.
 >
 > The npm package is **`dsh-study-tutor`** (the name `dsh-study-mode` on npm belongs to an unrelated project). This repository keeps the name `dsh-study-mode`.
 
