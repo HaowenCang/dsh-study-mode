@@ -40,7 +40,7 @@ describe('DSH bundle manifest', () => {
     assert.deepEqual(pkg.dsh.bundle, { patch: './cordis.patch.yml' })
     assert.equal(pkg.dsh.client.platform, 'web')
     assert.equal(pkg.repository.url, 'git+https://github.com/HaowenCang/dsh-study-mode.git')
-    assert.equal(pkg.version, '0.2.0')
+    assert.equal(pkg.version, '0.2.1')
     assert.match(readFileSync(join(root, 'LICENSE'), 'utf8'), /^MIT License/)
   })
 
