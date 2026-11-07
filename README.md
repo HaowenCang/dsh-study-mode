@@ -4,20 +4,20 @@ English | [中文](README.zh.md)
 
 Study Mode for [DeepSeek Harness](https://github.com/deepseek-ai) (DSH): a teaching agent preset for physics, mathematics and engineering in which the Host, not the model, owns attempts, grading and learning evidence. It also adds validated rich visuals: function plots, charts, diagrams, heatmaps, sanitized SVG drawings, workspace images, deterministic physics demos and a bounded Mermaid flowchart subset. Figures can appear inside the answer, next to the text that discusses them.
 
-> **Status: 0.2.1.** Tested on DSH `0.2.1-rc.3` and `0.2.1-rc.5` with a deterministic mock model provider and real Host and browser processes (on rc.5 also one real-model session), and used in DSH Desktop with a real model (teaching, inline figures, model-written question cards) without open issues. There is no systematic evaluation of teaching quality or of the questions a real model writes.
+> **Status: 0.2.2.** Tested on DSH `0.2.1-rc.3`, `0.2.1-rc.5` and `0.2.2-rc.1` with a deterministic mock model provider and real Host and browser processes (on rc.5 also one real-model session), and used in DSH Desktop with a real model (teaching, inline figures, model-written question cards) without open issues. There is no systematic evaluation of teaching quality or of the questions a real model writes.
 >
-> 0.2.1 restores compatibility with DSH `0.2.2-rc.1`, whose `tools` service no longer exposes the `presentAs()` API that 0.2.0's Study agent called: the agent now uses it only when the running DSH still provides it.
+> 0.2.2 adapts the package to DSH `0.2.2`, whose `tools` service removed the `presentAs()` API that 0.2.0's Study agent called. The Study preset now declares native tool presentation with its own `@deepseek-ai/dsh-agent-tool-presentation` row: DSH 0.2.1 implements that selector with `presentAs()`, and DSH 0.2.2 mounts the native tool executor instead. Teaching therefore stays native even when a deployment defaults to PTC, on every supported DSH. The supported range is `>=0.2.1-rc.3 <0.2.3`.
 >
 > The npm package is **`dsh-study-tutor`** (the name `dsh-study-mode` on npm belongs to an unrelated project). This repository keeps the name `dsh-study-mode`.
 
 ## Install
 
-Requires DSH `>=0.2.1-rc.3 <0.2.2` and Node.js `>=24.13.0`.
+Requires DSH `>=0.2.1-rc.3 <0.2.3` and Node.js `>=24.13.0`.
 
 ```sh
 dsh plugin --profile <profile> add dsh-study-tutor
 # or pinned from GitHub:
-dsh plugin --profile <profile> add github:HaowenCang/dsh-study-mode#v0.2.1
+dsh plugin --profile <profile> add github:HaowenCang/dsh-study-mode#v0.2.2
 ```
 
 **Upgrading from 0.1.0 or a preview (package name `dsh-study-mode`):** quit DSH Desktop completely, run `dsh plugin --profile <profile> remove dsh-study-mode`, then add `dsh-study-tutor`, and start a new session. Installing while Desktop is running can leave the old Study preset code loaded. Learning data stays in `$DSH_HOME/study-core/study.db`, and the bundle row keeps the id `dsh-study-mode`, so existing `cordis.patch.yml` overrides still apply. 0.2.0 moves the database to schema 3, which 0.1.0 refuses: back up `study.db` first if you may go back.

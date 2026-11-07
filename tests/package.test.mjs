@@ -36,11 +36,11 @@ describe('DSH bundle manifest', () => {
     assert.equal(pkg.license, 'MIT')
     assert.equal(pkg.private, undefined)
     assert.equal(pkg.type, 'module')
-    assert.equal(pkg.engines.dsh, '>=0.2.1-rc.3 <0.2.2')
+    assert.equal(pkg.engines.dsh, '>=0.2.1-rc.3 <0.2.3')
     assert.deepEqual(pkg.dsh.bundle, { patch: './cordis.patch.yml' })
     assert.equal(pkg.dsh.client.platform, 'web')
     assert.equal(pkg.repository.url, 'git+https://github.com/HaowenCang/dsh-study-mode.git')
-    assert.equal(pkg.version, '0.2.1')
+    assert.equal(pkg.version, '0.2.2')
     assert.match(readFileSync(join(root, 'LICENSE'), 'utf8'), /^MIT License/)
   })
 
@@ -61,10 +61,15 @@ describe('DSH bundle manifest', () => {
     for (const hook of ['prepare', 'preinstall', 'install', 'postinstall', 'prepack']) assert.equal(pkg.scripts?.[hook], undefined, hook)
   })
 
-  it('mounts one Loader row for the package plus the Study preset agent row', () => {
+  it('mounts one Loader row for the package plus the Study preset agent rows', () => {
     assert.deepEqual([...patch.matchAll(/^\s+name: '?([^'\s]+)'?\s*$/gm)].map(match => match[1]), [
-      'dsh-study-tutor', '@deepseek-ai/dsh-agent-preset', 'dsh-study-tutor/agent', '@deepseek-ai/dsh-tool-skill',
+      'dsh-study-tutor', '@deepseek-ai/dsh-agent-preset', '@deepseek-ai/dsh-agent-tool-presentation',
+      'dsh-study-tutor/agent', '@deepseek-ai/dsh-tool-skill',
     ])
+    // 0.2.2 removed tools.presentAs(); the preset's selector row is the
+    // documented cross-version way to keep teaching native.
+    assert.match(patch, /name: '@deepseek-ai\/dsh-agent-tool-presentation'/)
+    assert.match(patch, /mode: native/)
     // The row id stays dsh-study-mode so existing profile overrides of that row keep applying after the npm rename.
     assert.match(patch, /^    - id: dsh-study-mode$/m)
     assert.doesNotMatch(patch, /dsh-study-core|dsh-rich-response/)
@@ -111,17 +116,26 @@ describe('built entries', () => {
     assert.deepEqual(children, ['dsh-study-core', 'dsh-rich-response'])
   })
 
-  it('the agent entry loads the bundled teaching Skill', async () => {
+  it('the agent entry loads the bundled teaching Skill without the removed presentAs() API', async () => {
     const entry = await import(pathToFileURL(join(root, 'lib', 'agent.js')).href)
     let skill
+    let denied
     entry.apply({
       effect(callback) { callback() },
-      tools: { presentAs: () => () => {}, schemas: () => [], restrict: () => () => {}, guard: () => () => {} },
+      tools: {
+        // 0.2.2 removed tools.presentAs(); the preset's presentation row owns it now.
+        presentAs() { throw new Error('the Study agent must not call tools.presentAs()') },
+        schemas: () => [{ name: 'read_file' }, { name: 'study_get_state' }, { name: 'run_code' }],
+        restrict(filter) { denied = filter.deny; return () => {} },
+        guard: () => () => {},
+      },
       systemPrompt: { getSectionOrder: () => 1, section: () => () => {} },
       skills: { register(value) { skill = value; return () => {} } },
     })
     assert.equal(skill.name, 'study-systematic-teaching')
     assert.match(skill.content, /H0/)
+    // Only unrelated globals are denied; the reserved PTC transport is not named.
+    assert.deepEqual(denied, ['read_file'])
   })
 
   it('committed lib/ matches a fresh build of the sources', () => {

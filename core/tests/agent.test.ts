@@ -7,7 +7,7 @@ test('Study preset contributes a scoped teaching policy and omits filesystem/she
   assert.ok(existsSync(new URL('../src/agent/index.ts',import.meta.url)),'Study Agent preset is not implemented');
   const {configureStudyAgent}=await import('../src/agent/index.ts');
   let restriction:{deny:string[]}|undefined,policy='',skill:any;const disposers:(()=>void)[]=[];
-  const scope={effect:(f:()=>()=>void)=>disposers.push(f()),tools:{presentAs:()=>()=>{},schemas:()=>['rich_render','study_get_state','study_issue_question','study_teaching_step','skill','pwsh','read_file','write_file'].map(name=>({name})),restrict:(filter:{deny:string[]})=>{restriction=filter;return()=>{};},guard:()=>()=>{}}};
+  const scope={effect:(f:()=>()=>void)=>disposers.push(f()),tools:{schemas:()=>['rich_render','study_get_state','study_issue_question','study_teaching_step','skill','pwsh','read_file','write_file'].map(name=>({name})),restrict:(filter:{deny:string[]})=>{restriction=filter;return()=>{};},guard:()=>()=>{}}};
   const ctx={effect:scope.effect,tools:scope.tools,systemPrompt:{getSectionOrder:()=>1,section:(section:{text:string})=>{policy=section.text;return()=>{};}},skills:{register:(value:unknown)=>{skill=value;return()=>{};}}};
   configureStudyAgent(ctx,'A supplied, source-controlled teaching skill.');
   assert.deepEqual(restriction?.deny,['pwsh','read_file','write_file']);
@@ -18,7 +18,7 @@ test('Study preset contributes a scoped teaching policy and omits filesystem/she
 test('Study guard refuses directory changes and future non-teaching tools in the runtime own layer',async()=>{
   const {configureStudyAgent}=await import('../src/agent/index.ts');
   let guard:((exec:{name:string;arguments:unknown})=>string|undefined)|undefined;
-  const scope={effect:(f:()=>()=>void)=>{f();},tools:{presentAs:()=>()=>{},schemas:()=>[{name:'working_directory'},{name:'study_get_state'}],restrict:()=>()=>{},guard:(value:typeof guard)=>{guard=value;return()=>{};}}};
+  const scope={effect:(f:()=>()=>void)=>{f();},tools:{schemas:()=>[{name:'working_directory'},{name:'study_get_state'}],restrict:()=>()=>{},guard:(value:typeof guard)=>{guard=value;return()=>{};}}};
   configureStudyAgent({effect:scope.effect,tools:scope.tools,systemPrompt:{getSectionOrder:()=>1,section:()=>()=>{}},skills:{register:()=>()=>{}}},'Skill');
   assert.equal(typeof guard,'function','No monotonic guard was installed');
   assert.match(guard!({name:'working_directory',arguments:{cd:'E:\\outside'}})??'',/directory/i);
@@ -26,16 +26,20 @@ test('Study guard refuses directory changes and future non-teaching tools in the
   assert.match(guard!({name:'pwsh',arguments:{command:'anything'}})??'',/Study/);
 });
 
-test('PTC deployment uses scoped native presentation without restricting reserved transport',async()=>{
+test('native presentation belongs to the preset row, and the agent never restricts the reserved transport',async()=>{
   const {configureStudyAgent}=await import('../src/agent/index.ts');
-  let mode:string|undefined,deny:string[]=[],guard:((exec:{name:string;arguments:unknown})=>string|undefined)|undefined;
-  configureStudyAgent({effect:f=>{f();},tools:{
-    presentAs:value=>{mode=value;return()=>{};},
+  let presentAsCalls=0,deny:string[]=[],guard:((exec:{name:string;arguments:unknown})=>string|undefined)|undefined;
+  // 0.2.2 removed tools.presentAs(); the preset's tool-presentation row owns it
+  // on both 0.2.1 (selector -> presentAs) and 0.2.2 (selector -> native executor).
+  const tools={
+    presentAs:()=>{presentAsCalls+=1;return()=>{};},
     schemas:()=>['run_code','pwsh','study_get_state'].map(name=>({name})),
-    restrict:filter=>{assert.ok(!filter.deny.includes('run_code'),'Reserved PTC transport cannot be restricted');deny=filter.deny;return()=>{};},
-    guard:value=>{guard=value;return()=>{};},
-  },systemPrompt:{getSectionOrder:()=>1,section:()=>()=>{}},skills:{register:()=>()=>{}}},'Skill');
-  assert.equal(mode,'native');assert.deepEqual(deny,['pwsh']);
+    restrict:(filter:{deny:string[]})=>{assert.ok(!filter.deny.includes('run_code'),'Reserved PTC transport cannot be restricted');deny=filter.deny;return()=>{};},
+    guard:(value:typeof guard)=>{guard=value;return()=>{};},
+  };
+  configureStudyAgent({effect:(f:()=>()=>void)=>{f();},tools,systemPrompt:{getSectionOrder:()=>1,section:()=>()=>{}},skills:{register:()=>()=>{}}},'Skill');
+  assert.equal(presentAsCalls,0,'the agent must not select a presentation itself');
+  assert.deepEqual(deny,['pwsh']);
   assert.match(guard!({name:'run_code',arguments:{code:'anything'}})??'',/Study/);
   assert.equal(guard!({name:'study_get_state',arguments:{}}),undefined);
 });
@@ -54,7 +58,7 @@ test('teaching mode defaults to systematic and persists without changing capabil
 test('Study preset admits the bounded Mermaid flowchart tool and names it in the teaching policy',async()=>{
   const {configureStudyAgent}=await import('../src/agent/index.ts');
   let restriction:{deny:string[]}|undefined,guard:((exec:{name:string;arguments:unknown})=>string|undefined)|undefined,policy='';
-  const tools={presentAs:()=>()=>{},schemas:()=>['rich_mermaid','rich_render','pwsh'].map(name=>({name})),restrict:(filter:{deny:string[]})=>{restriction=filter;return()=>{};},guard:(value:typeof guard)=>{guard=value;return()=>{};}};
+  const tools={schemas:()=>['rich_mermaid','rich_render','pwsh'].map(name=>({name})),restrict:(filter:{deny:string[]})=>{restriction=filter;return()=>{};},guard:(value:typeof guard)=>{guard=value;return()=>{};}};
   configureStudyAgent({effect:(f:()=>()=>void)=>{f();},tools,systemPrompt:{getSectionOrder:()=>1,section:(section:{text:string})=>{policy=section.text;return()=>{};}},skills:{register:()=>()=>{}}},'Skill');
   assert.deepEqual(restriction?.deny,['pwsh']);
   assert.equal(guard!({name:'rich_mermaid',arguments:{title:'t',source:'flowchart TD\nA-->B'}}),undefined);
@@ -64,7 +68,7 @@ test('Study preset admits the bounded Mermaid flowchart tool and names it in the
 test('Study preset admits the heatmap and workspace image tools and names them in the teaching policy',async()=>{
   const {configureStudyAgent}=await import('../src/agent/index.ts');
   let restriction:{deny:string[]}|undefined,guard:((exec:{name:string;arguments:unknown})=>string|undefined)|undefined,policy='';
-  const tools={presentAs:()=>()=>{},schemas:()=>['rich_heatmap','rich_image','read_image','pwsh'].map(name=>({name})),restrict:(filter:{deny:string[]})=>{restriction=filter;return()=>{};},guard:(value:typeof guard)=>{guard=value;return()=>{};}};
+  const tools={schemas:()=>['rich_heatmap','rich_image','read_image','pwsh'].map(name=>({name})),restrict:(filter:{deny:string[]})=>{restriction=filter;return()=>{};},guard:(value:typeof guard)=>{guard=value;return()=>{};}};
   configureStudyAgent({effect:(f:()=>()=>void)=>{f();},tools,systemPrompt:{getSectionOrder:()=>1,section:(section:{text:string})=>{policy=section.text;return()=>{};}},skills:{register:()=>()=>{}}},'Skill');
   assert.deepEqual(restriction?.deny,['read_image','pwsh']);
   assert.equal(guard!({name:'rich_heatmap',arguments:{content:{}}}),undefined);
@@ -77,7 +81,7 @@ test('Study preset admits the heatmap and workspace image tools and names them i
 test('VIS-03: Study preset admits rich_svg and tells the model to place the returned figure line in its answer',async()=>{
   const {configureStudyAgent}=await import('../src/agent/index.ts');
   let restriction:{deny:string[]}|undefined,guard:((exec:{name:string;arguments:unknown})=>string|undefined)|undefined,policy='';
-  const tools={presentAs:()=>()=>{},schemas:()=>['rich_svg','rich_render','pwsh'].map(name=>({name})),restrict:(filter:{deny:string[]})=>{restriction=filter;return()=>{};},guard:(value:typeof guard)=>{guard=value;return()=>{};}};
+  const tools={schemas:()=>['rich_svg','rich_render','pwsh'].map(name=>({name})),restrict:(filter:{deny:string[]})=>{restriction=filter;return()=>{};},guard:(value:typeof guard)=>{guard=value;return()=>{};}};
   configureStudyAgent({effect:(f:()=>()=>void)=>{f();},tools,systemPrompt:{getSectionOrder:()=>1,section:(section:{text:string})=>{policy=section.text;return()=>{};}},skills:{register:()=>()=>{}}},'Skill');
   assert.deepEqual(restriction?.deny,['pwsh']);
   assert.equal(guard!({name:'rich_svg',arguments:{title:'t',svg:'<svg viewBox="0 0 1 1"/>'}}),undefined);
@@ -90,7 +94,7 @@ test('VIS-03: Study preset admits rich_svg and tells the model to place the retu
 test('STUDY-02: Study preset admits authoring and model review and tells the model how to write questions',async()=>{
   const {configureStudyAgent}=await import('../src/agent/index.ts');
   let guard:((exec:{name:string;arguments:unknown})=>string|undefined)|undefined,policy='';
-  const tools={presentAs:()=>()=>{},schemas:()=>['study_author_question','study_model_review'].map(name=>({name})),restrict:()=>()=>{},guard:(value:typeof guard)=>{guard=value;return()=>{};}};
+  const tools={schemas:()=>['study_author_question','study_model_review'].map(name=>({name})),restrict:()=>()=>{},guard:(value:typeof guard)=>{guard=value;return()=>{};}};
   configureStudyAgent({effect:(f:()=>()=>void)=>{f();},tools,systemPrompt:{getSectionOrder:()=>1,section:(section:{text:string})=>{policy=section.text;return()=>{};}},skills:{register:()=>()=>{}}},'Skill');
   assert.equal(guard!({name:'study_author_question',arguments:{}}),undefined);
   assert.equal(guard!({name:'study_model_review',arguments:{}}),undefined);

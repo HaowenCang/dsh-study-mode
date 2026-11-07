@@ -4,7 +4,7 @@ export const inject=['tools','systemPrompt','skills'];
 const allowed=['rich_render','rich_physics_demo','rich_mermaid','rich_heatmap','rich_image','rich_svg','study_get_state','study_get_plan','study_issue_question','study_author_question','study_model_review','study_teaching_step','skill','working_directory'];
 export interface AgentContext {
   effect:(callback:()=>()=>void)=>void;
-  tools:{presentAs?:(mode:'native')=>()=>void;schemas:()=>{name:string}[];restrict:(filter:{deny:string[]})=>()=>void;guard:(guard:(exec:{name:string;arguments:unknown})=>string|undefined)=>()=>void};
+  tools:{schemas:()=>{name:string}[];restrict:(filter:{deny:string[]})=>()=>void;guard:(guard:(exec:{name:string;arguments:unknown})=>string|undefined)=>()=>void};
   systemPrompt:{getSectionOrder:(key:string)=>number;section:(section:{name:string;order:number;text:string;interpolate?:boolean})=>()=>void};
   skills:{register:(skill:{name:string;description:string;content:string;source:string;invocation:{modelInvocable:boolean;userInvocable:boolean}})=>()=>void};
 }
@@ -12,11 +12,12 @@ export function configureStudyAgent(ctx:AgentContext,skillContent:string):void{
   // A preset generation is an ancestor scope, not an Agent event recipient.
   // Deny current unrelated globals while admitting its scoped Skill loader;
   // the monotonic guard also constrains late and Agent-owned capabilities.
-  // Teaching prefers native tools even when the deployment defaults to PTC.
-  // presentAs() is the 0.2.1 API; 0.2.2 removed it, so only use it when present
-  // and otherwise rely on the deployment's tool executor (native in 0.2.2).
-  const presentAs=ctx.tools.presentAs;
-  if(presentAs)ctx.effect(()=>presentAs('native'));
+  // The bundle's preset row declares native tool presentation for every version
+  // this package supports: on DSH 0.2.1 that is @deepseek-ai/dsh-agent-tool-presentation
+  // calling the then-public tools.presentAs(), and on 0.2.2 the same selector
+  // mounts the native tool executor. Doing it as a preset row instead of an
+  // agent call is what keeps teaching native on 0.2.2, where presentAs() is gone,
+  // even when the deployment defaults to PTC.
   const denied=ctx.tools.schemas().map(tool=>tool.name).filter(name=>name!=='run_code'&&!allowed.includes(name));
   ctx.effect(()=>ctx.tools.restrict({deny:denied}));
   ctx.effect(()=>ctx.tools.guard(exec=>{

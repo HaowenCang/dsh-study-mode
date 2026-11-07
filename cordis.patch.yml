@@ -26,6 +26,15 @@
         description: 系统讲授、Host 作答证据与跨会话恢复
         order: 4
         plugins:
+          # Native tool presentation for this preset on every supported DSH:
+          # 0.2.1 implements the selector with tools.presentAs(), 0.2.2 mounts the
+          # native tool executor instead (presentAs was removed). Declaring it as
+          # a preset row keeps teaching native even when the deployment defaults
+          # to PTC; the row is DSH's documented cross-version compatibility path.
+          - id: study-tool-presentation
+            name: '@deepseek-ai/dsh-agent-tool-presentation'
+            config:
+              mode: native
           - id: study-agent
             name: dsh-study-tutor/agent
           - id: study-skill-loader

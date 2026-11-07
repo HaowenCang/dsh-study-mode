@@ -4,20 +4,20 @@
 
 DeepSeek Harness（DSH）的学习模式插件：面向物理、数学和工程的教学 Agent 预设。作答、判分和学习证据由 Host 掌握，而不是由模型决定。插件同时提供经验证的富视觉：函数曲线、统计图、示意图、热力图、经过净化的 SVG 绘图、工作区图片、确定性物理演示，以及受限的 Mermaid 流程图子集。图可以插在回答正文中，紧挨着讲解它的文字。
 
-> **状态：0.2.1。** 已在 DSH `0.2.1-rc.3` 和 `0.2.1-rc.5` 上用确定性的模拟模型、真实的 Host 和浏览器进程完成测试（rc.5 上另有一次真实模型会话），并在 DSH 桌面版中接入真实模型使用过（讲授、正文插图、模型出题卡片），没有遗留问题。教学效果和真实模型出题的质量尚无系统评估。
+> **状态：0.2.2。** 已在 DSH `0.2.1-rc.3`、`0.2.1-rc.5` 和 `0.2.2-rc.1` 上用确定性的模拟模型、真实的 Host 和浏览器进程完成测试（rc.5 上另有一次真实模型会话），并在 DSH 桌面版中接入真实模型使用过（讲授、正文插图、模型出题卡片），没有遗留问题。教学效果和真实模型出题的质量尚无系统评估。
 >
-> 0.2.1 恢复了与 DSH `0.2.2-rc.1` 的兼容：该版本的 `tools` 服务不再提供 0.2.0 的 Study agent 所调用的 `presentAs()`，现在只在运行中的 DSH 仍然提供它时才调用。
+> 0.2.2 适配了 DSH `0.2.2`：它的 `tools` 服务移除了 0.2.0 的 Study agent 所调用的 `presentAs()`。Study 预设现在用自己的 `@deepseek-ai/dsh-agent-tool-presentation` 行声明原生工具呈现：DSH 0.2.1 用 `presentAs()` 实现该选择器，DSH 0.2.2 则改为挂载原生工具执行器。因此在所有受支持版本上，即使部署默认使用 PTC，教学仍使用原生工具。支持范围为 `>=0.2.1-rc.3 <0.2.3`。
 >
 > npm 包名为 **`dsh-study-tutor`**（npm 上的 `dsh-study-mode` 是另一个无关项目）。本仓库仍叫 `dsh-study-mode`。
 
 ## 安装
 
-需要 DSH `>=0.2.1-rc.3 <0.2.2` 和 Node.js `>=24.13.0`。
+需要 DSH `>=0.2.1-rc.3 <0.2.3` 和 Node.js `>=24.13.0`。
 
 ```sh
 dsh plugin --profile <profile> add dsh-study-tutor
 # 或从 GitHub 固定版本安装：
-dsh plugin --profile <profile> add github:HaowenCang/dsh-study-mode#v0.2.1
+dsh plugin --profile <profile> add github:HaowenCang/dsh-study-mode#v0.2.2
 ```
 
 **从 0.1.0 或预览版（包名 `dsh-study-mode`）升级：** 先完全退出 DSH 桌面版，执行 `dsh plugin --profile <profile> remove dsh-study-mode`，再添加 `dsh-study-tutor`，然后新建会话。桌面版运行时安装，可能让 Study 预设继续使用旧代码。学习数据仍在 `$DSH_HOME/study-core/study.db`；插件行的 id 仍是 `dsh-study-mode`，已有的 `cordis.patch.yml` 覆盖照样生效。0.2.0 会把数据库升级到 schema 3，0.1.0 无法打开；如果可能回退，请先备份 `study.db`。
