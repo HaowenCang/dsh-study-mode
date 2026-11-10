@@ -67,6 +67,10 @@ export async function launchContext(p1Root, options = {}) {
     viewport: options.viewport ?? { width: 1440, height: 1000 },
     args: ['--no-first-run', '--no-default-browser-check'],
   })
+  // Every isolated launch issues a new, uniquely named dsh-auth-* cookie for 127.0.0.1 (cookies ignore the port).
+  // The persistent test profile kept them all: after ~70 launches the Cookie header (~20 KB) drew HTTP 431
+  // (P9, 2026-11-10). Old launches' cookies are useless; openApp's token URL sets the current one.
+  await context.clearCookies({ name: /^dsh-auth-/ })
   const page = context.pages()[0] ?? await context.newPage()
   const diagnostics = { consoleErrors: [], pageErrors: [], requests: [] }
   page.on('console', (message) => {

@@ -57,7 +57,8 @@ export type CommandResultLike =
 /** Subset of the Cordis context this Host plugin consumes. */
 export interface HostContext {
   effect(callback: () => undefined | (() => void)): void
-  readonly tools: { register(definition: ToolDefinitionLike): () => void }
+  /** `setExecutor` exists from DSH 0.2.2 (the Host whose client draws inline figure fences). */
+  readonly tools: { register(definition: ToolDefinitionLike): () => void; readonly setExecutor?: unknown }
   readonly commands: { register(definition: CommandDefinitionLike): () => void }
   readonly logger: HostLogger
   /** Strict optional-service lookup; `rich_image` reads `fs` and `workingDirectory` through it at call time. */
@@ -82,4 +83,10 @@ export interface HostConfig {
    * the DSH file route, which serves only paths its filesystem policy allows.
    */
   readonly figuresDir?: string
+  /**
+   * Inline figures (plan P7). `on`: answers draw ```svg / ```mermaid / ```dsh-* fences in the body,
+   * the figure tools write no file and return no image line, and `rich_check_figure` is offered.
+   * `off`: the 0.2.1 figure-file route. `auto` (default): on when the Host is DSH 0.2.2 or later.
+   */
+  readonly inline?: 'auto' | 'on' | 'off'
 }

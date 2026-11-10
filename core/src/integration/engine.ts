@@ -80,6 +80,26 @@ export class StudyEngine {
   }
   questions(){return this.catalog.map(publicQuestion);}
   attempt(id:string){return this.view(this.internal(id));}
+  /**
+   * Find, as a pure read, the attempt that study_issue_question or study_author_question issued in this session
+   * under the tool call `callId` (the idempotency request ID). Only an issuing result locates an attempt, and it must
+   * match the attempt's first, 'issued' event in the same session; anything else is an unknown attempt.
+   */
+  locate(sessionId:string,callId:string){
+    text(sessionId,'session ID');text(callId,'call ID');
+    const unknown=()=>new Error('Unknown attempt');
+    const stored=this.store.operationResult(JSON.stringify([this.learnerId,sessionId,callId]));
+    if(stored===undefined)throw unknown();
+    let result:unknown;try{result=JSON.parse(stored);}catch{throw unknown();}
+    if(result===null||typeof result!=='object'||Array.isArray(result))throw unknown();
+    const r=result as Partial<Attempt>&{hintText?:unknown};
+    // An issuing result has no hint, submission or review yet; hint/submit/review results always do.
+    if(typeof r.attemptId!=='string'||r.sessionId!==sessionId||r.status!=='issued'||!Array.isArray(r.hints)||r.hints.length!==0||r.submittedAt!==undefined||r.hintText!==undefined)throw unknown();
+    const first=this.store.events(this.learnerId,'attempt:'+r.attemptId)[0];
+    const a=first?.payload as Attempt|undefined;
+    if(first?.kind!=='issued'||first.sessionId!==sessionId||!a||a.attemptId!==r.attemptId||a.sessionId!==sessionId||a.learnerId!==this.learnerId||a.issuedAt!==r.issuedAt||a.questionId!==r.questionId||a.questionVersion!==r.questionVersion)throw unknown();
+    return this.attempt(a.attemptId);
+  }
   issue(sessionId:string,questionId:string,requestId:string){
     return this.transaction(sessionId,requestId,{operation:'issue',questionId},()=>{
       const q=this.catalog.find(q=>q.id===questionId);if(!q)throw new Error('Unknown trusted question');

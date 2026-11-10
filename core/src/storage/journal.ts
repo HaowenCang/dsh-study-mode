@@ -68,6 +68,11 @@ export class StudyStore {
       this.db.exec('COMMIT'); return JSON.parse(canonical(result)) as T;
     }catch(error){this.db.exec('ROLLBACK');throw error;}
   }
+  /** The stored result of a completed idempotent operation, read without a transaction or any write. */
+  operationResult(id:string):string|undefined{
+    const row=this.db.prepare('SELECT result FROM operations WHERE id=?').get(id);
+    return row?String(row.result):undefined;
+  }
   append(event:Omit<Event,'id'>):void{
     const value={...event,id:randomUUID()},body=canonical(value);
     const previous=String(this.db.prepare('SELECT hash FROM events ORDER BY seq DESC LIMIT 1').get()?.hash??'');

@@ -4,9 +4,9 @@ English | [中文](README.zh.md)
 
 Study Mode for [DeepSeek Harness](https://github.com/deepseek-ai) (DSH): a teaching agent preset for physics, mathematics and engineering in which the Host, not the model, owns attempts, grading and learning evidence. It also adds validated rich visuals: function plots, charts, diagrams, heatmaps, sanitized SVG drawings, workspace images, deterministic physics demos and a bounded Mermaid flowchart subset. Figures can appear inside the answer, next to the text that discusses them.
 
-> **Status: 0.2.2.** Tested on DSH `0.2.1-rc.3`, `0.2.1-rc.5` and `0.2.2-rc.1` with a deterministic mock model provider and real Host and browser processes (on rc.5 also one real-model session), and used in DSH Desktop with a real model (teaching, inline figures, model-written question cards) without open issues. There is no systematic evaluation of teaching quality or of the questions a real model writes.
+> **Status: 0.3.0.** Tested on DSH `0.2.2-rc.1` and `0.2.1-rc.5` with a deterministic mock model provider and real Host and browser processes. Earlier versions were also used in DSH Desktop with a real model (teaching, figure lines, model-written question cards). The new in-reply figures and question cards of 0.3.0 have **not** yet been used with a real model, and there is no systematic evaluation of teaching quality or of the questions a real model writes.
 >
-> 0.2.2 adapts the package to DSH `0.2.2`, whose `tools` service removed the `presentAs()` API that 0.2.0's Study agent called. The Study preset now declares native tool presentation with its own `@deepseek-ai/dsh-agent-tool-presentation` row: DSH 0.2.1 implements that selector with `presentAs()`, and DSH 0.2.2 mounts the native tool executor instead. Teaching therefore stays native even when a deployment defaults to PTC, on every supported DSH. The supported range is `>=0.2.1-rc.3 <0.2.3`.
+> 0.3.0 draws figures and question cards **in the reply** on DSH 0.2.2: the model writes restricted ` ```svg `, ` ```mermaid `, ` ```dsh-plot `, ` ```dsh-heatmap ` or ` ```dsh-physics ` blocks where a figure belongs, and they are drawn there while the answer streams, with a source toggle and light/dark colours; Study question cards appear where the tool was called. On DSH 0.2.1 nothing changes: figures keep the 0.2.x figure-file route (see [Figures in the answer](#figures-in-the-answer)). Native tool presentation stays on the Study preset's own `@deepseek-ai/dsh-agent-tool-presentation` row (since 0.2.2). The supported range is `>=0.2.1-rc.3 <0.2.3`.
 >
 > The npm package is **`dsh-study-tutor`** (the name `dsh-study-mode` on npm belongs to an unrelated project). This repository keeps the name `dsh-study-mode`.
 
@@ -17,8 +17,10 @@ Requires DSH `>=0.2.1-rc.3 <0.2.3` and Node.js `>=24.13.0`.
 ```sh
 dsh plugin --profile <profile> add dsh-study-tutor
 # or pinned from GitHub:
-dsh plugin --profile <profile> add github:HaowenCang/dsh-study-mode#v0.2.2
+dsh plugin --profile <profile> add github:HaowenCang/dsh-study-mode#v0.3.0
 ```
+
+**Upgrading from 0.2.x:** quit DSH Desktop completely, run `dsh plugin --profile <profile> add dsh-study-tutor@0.3.0` (or the GitHub tag above), then start a new session. The database schema is unchanged.
 
 **Upgrading from 0.1.0 or a preview (package name `dsh-study-mode`):** quit DSH Desktop completely, run `dsh plugin --profile <profile> remove dsh-study-mode`, then add `dsh-study-tutor`, and start a new session. Installing while Desktop is running can leave the old Study preset code loaded. Learning data stays in `$DSH_HOME/study-core/study.db`, and the bundle row keeps the id `dsh-study-mode`, so existing `cordis.patch.yml` overrides still apply. 0.2.0 moves the database to schema 3, which 0.1.0 refuses: back up `study.db` first if you may go back.
 
@@ -44,6 +46,7 @@ The built `lib/` is committed, so a Git install runs no build script and needs n
 | `rich_heatmap` | Draw a numeric matrix as a heatmap (sequential or diverging palette, up to 128 x 128 / 4,096 cells) with SVG export |
 | `rich_image` | Show an existing PNG, JPEG, GIF or WebP file from the session's working directory to the learner (see below) |
 | `rich_svg` | Draw a schematic (force diagram, geometry, circuit, apparatus) from an allowlisted SVG subset (see below) |
+| `rich_check_figure` | DSH 0.2.2: check a figure block before writing it in the answer; returns OK or line-numbered issues, draws and stores nothing |
 
 **Commands**: `/study-mode` switches teaching mode without clearing history; `/study-attempt` is used by the answer cards; `/study-review` (human review) is registered only when `enableHumanReview` is on; `rich-interaction` records card button actions in the original session.
 
@@ -57,14 +60,34 @@ The built `lib/` is committed, so a Git install runs no build script and needs n
 
 ## Bounded Mermaid
 
-DSH's chat Markdown shows a fenced `mermaid` block as plain code. `rich_mermaid` does not run Mermaid; it compiles a strict subset to the built-in diagram renderer:
+Mermaid itself never runs. `rich_mermaid` (and, on DSH 0.2.2, a ` ```mermaid ` block in the answer) compiles a strict subset to the built-in diagram renderer; DSH's own Markdown would show the block as plain code:
 
 - `flowchart` / `graph` with `TD`, `TB`, `BT`, `LR`, `RL`; at most 5 levels and about 5 nodes side by side.
 - Nodes `A`, `A[box]`, `A(rounded)`, `A([stadium])` (drawn rounded), `A{decision}`, `A((circle))`; links `-->`, `-.->`, `-->|label|`, `-- label -->`, chains.
 - Labels are plain text: HTML, entities and markdown are refused (write averages as ⟨p⟩).
 - Anything else, and any layout in which a link would cross a node, a label would be hidden or overlap, or an arrow would be invisible, fails with line-numbered issues instead of being drawn approximately.
 
-## Inline figures
+## Figures in the answer
+
+### DSH 0.2.2: figure blocks drawn in the reply
+
+The plugin replaces DSH's renderer for assistant replies through the documented slot priority mechanism (it falls back to DSH's own renderer automatically if that contract changes). Top-level fenced blocks in an answer are drawn in place:
+
+| Block | Content |
+|---|---|
+| ` ```svg `, ` ```dsh-svg ` | One `<svg viewBox=…>` from the `rich_svg` allowlist below; drawn element by element while it streams |
+| ` ```mermaid `, ` ```dsh-mermaid ` | The bounded Mermaid subset above; `%% title: …` names the figure |
+| ` ```dsh-plot ` | `rich_render` line/scatter plot JSON, or `{"title","fns":[{"expr","label"}],"x":[a,b]}` with expressions in `x`, numbers, `+ - * / ^`, parentheses and `sin cos tan exp log sqrt abs pi e` (at most 8 curves) |
+| ` ```dsh-heatmap ` | `rich_heatmap` content JSON |
+| ` ```dsh-physics ` | `{"demo":"infinite_well"}`, `"harmonic_oscillator"` or `"ising"` |
+
+Every figure has a “source” toggle. A rejected ` ```svg ` or ` ```mermaid ` block is shown as ordinary code; a rejected `dsh-*` block shows its line-numbered issues. Nothing is written to disk and no local path enters the answer. Colours follow the light or dark theme (near-black ink becomes the text colour, near-white fills the page surface). This applies in every session, so ordinary ` ```svg ` and ` ```mermaid ` blocks are drawn too. The Study prompt teaches the block syntax and `rich_check_figure` when inline figures are on.
+
+Study question cards (`study_issue_question`, `study_author_question`) appear in the reply where the tool was called. The card asks the Host which question that call issued in this session (a read-only lookup) and does not trust the transcript; answering, hints and grading work exactly as before, and the tool record shows a link to the card instead of a second copy.
+
+`rich.inline` controls this: `auto` (default; on for DSH 0.2.2 and later, off on 0.2.1), `on` or `off`. In a browser, `localStorage['dsh-rich-inline'] = 'off'` turns the reply renderer off for that browser.
+
+### DSH 0.2.1 (or `rich.inline: off`): figure lines
 
 `rich_render`, `rich_mermaid`, `rich_heatmap`, `rich_svg` and `rich_image` write a static copy of their figure to `$DSH_HOME/rich-response/figures/<session>/` (default `~/.dsh/...`, or `rich.figuresDir`) and return one Markdown image line, `![title](<absolute path>)`. The model copies that line into its answer where the figure belongs, and DSH's Markdown shows it there through its authenticated file route. The interactive card stays in the tool record. Files are content-addressed and never overwritten, so an answer that was already shown keeps its picture.
 
@@ -89,7 +112,7 @@ The bundle row `dsh-study-mode` reads these launch environment variables; overri
 | `DSH_STUDY_PLANS` | `core.plansPath` | Course plan definitions JSON (optional) |
 | `DSH_RICH_RESPONSE_AUDIT_LOG` | `rich.auditLog` | Optional JSONL audit log of card interactions |
 
-Other keys: `core.learnerId` (default `local-learner`), `core.enableHumanReview` (default `false`), `rich.maxTrackedAttempts` (default `512`), `rich.maxImageBytes` (default `524288`), `rich.figuresDir` (default `$DSH_HOME/rich-response/figures`).
+Other keys: `rich.inline` (`auto`, `on` or `off`; default `auto`, see [Figures in the answer](#figures-in-the-answer)), `core.learnerId` (default `local-learner`), `core.enableHumanReview` (default `false`), `rich.maxTrackedAttempts` (default `512`), `rich.maxImageBytes` (default `524288`), `rich.figuresDir` (default `$DSH_HOME/rich-response/figures`).
 
 A **question catalog** is an array of versioned questions (`id`, `version`, `courseId`, `topicId`, `familyId`, `kind`, `prompt`, options or expected value, `answer`, `dimensions`, `coverage`, `hints.H1`…`H4`); see `data/synthetic.json`. A **course plan** is an array of `{ courseId, title, version, startDate, endDate, evidenceStatus: "not_imported", sources: [{ path, sha256 }], days: [{ day, unit, title, topics, tasks: [{ id, kind, title, minutes }] }] }`. Plans import definitions only, never learner grades.
 
@@ -118,7 +141,9 @@ npm run verify   # typecheck, build lib/, Study Core + Rich Response + package t
 - Mermaid: crossing labelled links are refused; three labelled nested decisions need `LR`; no subgraphs, styles, clicks or other diagram types.
 - The diagram canvas keeps a fixed layout; below 680 px it scrolls horizontally instead of shrinking the text.
 - Images: workspace files only; no external URLs and no image generation.
-- Inline figures: DSH's Markdown preview caps images at 360 px high, so tall drawings shrink (click to enlarge). Figure files are not cleaned up automatically.
+- Figures in the reply (DSH 0.2.2): whether a real model writes the blocks correctly is not yet verified; a short left-to-right Mermaid flowchart is drawn in a tall, mostly empty canvas; there is no full-screen view; a rejected block is not reported back to the model automatically (`rich_check_figure` and the prompt are the mitigation). The renderer mirrors DSH's own reply view, so a future DSH release may need an update (it falls back to DSH's renderer when the contract changes).
+- Question cards in the reply look up their question on the Host, which adds a few “学习记录已同步” rows to the session.
+- Figure lines (DSH 0.2.1): DSH's Markdown preview caps images at 360 px high, so tall drawings shrink (click to enlarge). Figure files are not cleaned up automatically.
 
 ## License
 

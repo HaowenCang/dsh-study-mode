@@ -17,6 +17,8 @@
         rich:
           auditLog: !!js process.env.DSH_RICH_RESPONSE_AUDIT_LOG
           maxTrackedAttempts: 512
+          # auto: figures are drawn inline from answer fences on DSH 0.2.2+, figure files on 0.2.1.
+          inline: auto
 - insert:
     - id: preset-study
       name: '@deepseek-ai/dsh-agent-preset'

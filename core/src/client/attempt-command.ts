@@ -20,3 +20,16 @@ export async function runAttemptCommand(remote:CommandRemote,sessionId:string,at
   // Settles instead of rejecting: an unmounted caller never awaits it.
   return {value,feedback:continueTeaching(remote.session,sessionId,value.attemptId,feedbackId).then(result=>({ok:result.ok}),()=>({ok:false}))};
 }
+/**
+ * Find the attempt that a study_issue_question / study_author_question call issued in this session, by its tool-call ID.
+ * Read-only on the Host: it records no event, hint, answer or request.
+ * @returns the current Host attempt view, validated against this session.
+ */
+export async function locateAttempt(remote:Pick<CommandRemote,'commands'>,sessionId:string,callId:string):Promise<CardAttempt>{
+  if(typeof callId!=='string'||!callId.trim()||callId.length>200)throw new Error('Invalid call ID');
+  const response=await remote.commands.execute(sessionId,'/study-attempt '+JSON.stringify({operation:'locate',callId}),[]);
+  if(!response.ok||response.value?.result.kind!=='success')throw new Error(response.value?.result.text??response.error?.message??'Host command failed');
+  const value=readAttempt(JSON.parse(response.value.result.text??'null'),sessionId);
+  if(!value)throw new Error('Invalid Host learning state');
+  return value;
+}

@@ -46,13 +46,22 @@ export function registerApi(ctx:ApiContext,engine:StudyEngine,enableHumanReview:
     },
   }));
   ctx.effect(()=>ctx.commands.register({
-    name:'study-attempt',description:'Human-only attempt status, hint or answer submission.',input:{hint:'Internal learning card command'},recordInput:false,
+    name:'study-attempt',description:'Human-only attempt status, hint, answer submission or read-only lookup by issuing tool call.',input:{hint:'Internal learning card command'},recordInput:false,
     async handler(invocation){
       try{
         if(invocation.signal.aborted)throw new Error('Study command aborted');
         if(invocation.rawInput.length>16384)throw new Error('Study command payload exceeds size limit');
-        const a=args(JSON.parse(invocation.rawInput),['operation','attemptId','requestId','level','answer']);
-        const id=text(a.attemptId,'attempt ID'),sessionId=invocation.agent.id;
+        const a=args(JSON.parse(invocation.rawInput),['operation','attemptId','callId','requestId','level','answer']);
+        const sessionId=invocation.agent.id;
+        if(a.operation==='locate'){
+          // Read-only: find the attempt a study tool issued in this session under this tool call. Writes nothing.
+          fields(a,['operation','callId','requestId']);
+          if(a.requestId!==undefined)text(a.requestId,'request ID');
+          const located=engine.locate(sessionId,text(a.callId,'call ID'));
+          if(located.sessionId!==sessionId)throw new Error('Attempt session mismatch');
+          return {kind:'success',text:JSON.stringify(located)};
+        }
+        const id=text(a.attemptId,'attempt ID');
         if(engine.attempt(id).sessionId!==sessionId)throw new Error('Attempt session mismatch');
         let result:unknown;
         if(a.operation==='read'){fields(a,['operation','attemptId']);result=engine.attempt(id);}

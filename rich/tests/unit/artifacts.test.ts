@@ -442,3 +442,32 @@ test('built client bundle: rich_svg shows the rebuilt card only through an image
   const surrogate = renderToolView(SvgView, { sessionId: 's', callId: 'c', toolName: 'rich_svg', phase: 'result', block: block({ kind: 'rich-svg', envelopeVersion: 1, title: 'x', svg: card.replace('</svg>', '<text>\ud800</text></svg>') }) })
   assert.match(surrogate, /data-dsh-rich="svg-invalid"/)
 })
+
+test('built client bundle: inline renderer registers only when the shared primitives module is present', () => {
+  // Without the module the tool views are unaffected (the lazy require is caught).
+  const missingRequested: string[] = []
+  const missing = loadClientBundle().factory(specifier => requireFromTable(missingRequested, specifier)) as { apply(ctx: unknown): void }
+  const withoutInline = applyClientPlugin(missing)
+  assert.equal(withoutInline.registrations.length, 6)
+  assert.ok(missingRequested.includes('@deepseek-ai/dsh-client-ui-primitives'))
+
+  // With the module the seventh registration shadows assistant-step at priority -1.
+  const primitives = { MarkdownText: () => null, CodeBlock: () => null }
+  const exports = loadClientBundle().factory(specifier => specifier === '@deepseek-ai/dsh-client-ui-primitives'
+    ? primitives
+    : requireFromTable([], specifier)) as { apply(ctx: unknown): void }
+  const specs: Record<string, unknown>[] = []
+  exports.apply({
+    slots: {
+      inject(_key: string, callback: () => undefined | (() => void)) { callback() },
+      register(spec: Record<string, unknown>) { specs.push(spec); return () => {} },
+    },
+    remote: { commands: { execute: async () => ({ ok: false, error: { code: 'NO_HOST', message: 'unit test' } }) } },
+    logger: { info() {}, warn() {}, error() {} },
+  })
+  assert.equal(specs.length, 7)
+  assert.deepEqual(specs[6], {
+    name: 'conversation.chat.node', key: 'assistant-step', priority: -1, locale: 'chat',
+    children: { 'rich.inline.toolcall': { kind: 'keyed', scope: 'session' } },
+  })
+})

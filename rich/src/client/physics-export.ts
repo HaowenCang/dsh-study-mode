@@ -19,10 +19,30 @@ export interface PhysicsSvgDetails {
   legend: { label: string; color: string }[]
   model: string[]
 }
-/** Literal colors shared by the on-screen chart and its self-contained export. */
+/** Literal colors of the self-contained export (always the light palette). */
 export const PHYSICS_SVG_THEME = {
   text: '#182433', muted: '#667085', border: '#ccd3dc', surface: '#f7f9fc',
   accent: '#247bbf', series: ['#247bbf', '#c95132', '#258545'],
+}
+
+/**
+ * On-screen colors (plan P6): DSH `--dsw-alias-*` tokens follow the light/dark theme
+ * (`body[data-ds-dark-theme]`), with the export literals as fallbacks. Series hues stay literal;
+ * they are mid-luminance and read on both backgrounds.
+ */
+export const PHYSICS_LIVE_THEME = {
+  text: `var(--dsw-alias-label-primary, ${PHYSICS_SVG_THEME.text})`,
+  muted: `var(--dsw-alias-label-secondary, ${PHYSICS_SVG_THEME.muted})`,
+  border: `var(--dsw-alias-border-l2, ${PHYSICS_SVG_THEME.border})`,
+  surface: `var(--dsw-alias-bg-layer-1, ${PHYSICS_SVG_THEME.surface})`,
+  accent: PHYSICS_SVG_THEME.accent,
+  series: PHYSICS_SVG_THEME.series,
+  background: 'var(--dsw-alias-bg-base, #ffffff)',
+}
+
+/** Replace every `var(--token, fallback)` with its literal fallback so a downloaded SVG is self-contained. */
+export function literalSvgColors(svg: string): string {
+  return svg.replace(/var\(--[\w-]+,\s*((?:[^()]|\([^()]*\))*)\)/gu, (_, fallback: string) => fallback.trim())
 }
 
 export function physicsSvgDetails(demo: PhysicsDemo, p: PhysicsPreferences): PhysicsSvgDetails {

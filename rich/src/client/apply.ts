@@ -11,6 +11,9 @@ import { PhysicsToolView } from './physics-view'
 import { HeatmapToolView } from './heatmap-view'
 import { ImageToolView } from './image-view'
 import { SvgToolView } from './svg-view'
+import { loadPrimitives, PRIMITIVES_MODULE } from './inline/platform'
+import { registerInlineAssistant } from './inline/register'
+import type { InlineContext } from './inline/register'
 
 /** Register the Client half through the official slot registry. */
 export function apply(ctx: ClientContext): void {
@@ -42,4 +45,15 @@ export function apply(ctx: ClientContext): void {
     key: 'rich_svg',
   }, SvgToolView))
   ctx.logger.info('rich-response: client half registered tool.call.toolview keys=rich_render,rich_physics_demo,rich_mermaid,rich_heatmap,rich_image,rich_svg')
+  registerInline(ctx)
+}
+
+/** In-body figures and inline tool-call cards (plan P2); never affects the tool views above. */
+function registerInline(ctx: ClientContext): void {
+  const { primitives, missing } = loadPrimitives()
+  if (primitives === undefined) {
+    ctx.logger.warn(`rich-response: inline renderer unavailable (${PRIMITIVES_MODULE}: ${missing.join(', ')})`)
+    return
+  }
+  registerInlineAssistant(ctx as unknown as InlineContext, { primitives })
 }

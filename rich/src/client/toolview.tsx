@@ -27,7 +27,7 @@ import { cardStyle, DSW } from './dsw'
 
 const SERIES_COLORS = ['#d94f2b', '#247bbf', '#1a7f37', '#8e44ad', '#c98a00', '#0f766e', '#b0355b', '#475569']
 
-function themeOf(): RendererTheme {
+export function themeOf(): RendererTheme {
   return {
     text: DSW.text,
     muted: DSW.muted,

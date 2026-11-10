@@ -56,6 +56,8 @@ export function displaySubmittedAnswer(a:CardAttempt):string{
 }
 export function commandSummary(outcome:{kind:string;text?:string}|null,sessionId:string):string{
   if(!outcome)return '正在核验学习记录…';
+  // An inline card looked its question up before the Host had stored it; the card retries by itself.
+  if(outcome.kind!=='success'&&outcome.text==='Unknown attempt')return '题卡尚未就绪，正文题卡会自动重试。';
   if(outcome.kind!=='success')return '学习操作未完成：'+(outcome.text??'请重试').slice(0,300);
   try{
     const a=readAttempt(JSON.parse(outcome.text??'null'),sessionId);

@@ -103,3 +103,31 @@ test('STUDY-02: Study preset admits authoring and model review and tells the mod
   assert.match(policy,/不要在回答正文里公布答案/);
   assert.match(policy,/新建课题/);assert.match(policy,/不要把题目放到无关的课题/);
 });
+
+test('P7: when Rich Response draws figures inline, the policy and skill teach figure fences instead of image lines',async()=>{
+  const {configureStudyAgent}=await import('../src/agent/index.ts');
+  const {readFileSync,existsSync:exists}=await import('node:fs');
+  // Repository layout: ../skills; assembled dsh-study-mode package: ../../skills (core/ is a subfolder).
+  const skillUrl=['../skills/','../../skills/'].map(base=>new URL(base+'study-systematic-teaching/SKILL.md',import.meta.url)).find(url=>exists(url))!;
+  const skillFile=readFileSync(skillUrl,'utf8');
+  const run=(names:string[])=>{
+    let guard:((exec:{name:string;arguments:unknown})=>string|undefined)|undefined,policy='',skill='',restriction:{deny:string[]}|undefined;
+    const tools={schemas:()=>names.map(name=>({name})),restrict:(filter:{deny:string[]})=>{restriction=filter;return()=>{};},guard:(value:typeof guard)=>{guard=value;return()=>{};}};
+    configureStudyAgent({effect:(f:()=>()=>void)=>{f();},tools,systemPrompt:{getSectionOrder:()=>1,section:(section:{text:string})=>{policy=section.text;return()=>{};}},skills:{register:(value:{content:string})=>{skill=value.content;return()=>{};}}},skillFile);
+    return {guard:guard!,policy,skill,restriction};
+  };
+  // rich_check_figure is registered by Rich Response only when its inline figures are active.
+  const inline=run(['rich_check_figure','rich_render','rich_image','pwsh']);
+  assert.deepEqual(inline.restriction?.deny,['pwsh']);
+  assert.equal(inline.guard({name:'rich_check_figure',arguments:{lang:'svg',source:'<svg/>'}}),undefined);
+  for(const fence of ['```svg','```mermaid','```dsh-plot','```dsh-heatmap','```dsh-physics'])assert.ok(inline.policy.includes(fence),fence);
+  assert.match(inline.policy,/rich_check_figure/);
+  assert.match(inline.policy,/viewBox/);assert.match(inline.policy,/"fns"/);assert.match(inline.policy,/harmonic_oscillator/);
+  assert.doesNotMatch(inline.policy,/!\[|原样复制|不会被渲染|不要在回答中直接书写 SVG/);
+  assert.match(inline.policy,/rich_image/);
+  assert.match(inline.skill,/```svg/);assert.doesNotMatch(inline.skill,/!\[标题\]\(路径\)|svg\/mermaid 代码块/);
+  // Legacy hosts (0.2.1, or Rich Response inline off) keep the image-line route word for word.
+  const legacy=run(['rich_render','rich_svg','pwsh']);
+  assert.match(legacy.policy,/原样复制/);assert.doesNotMatch(legacy.policy,/rich_check_figure|```dsh-plot/);
+  assert.match(legacy.skill,/!\[标题\]\(路径\)/);
+});

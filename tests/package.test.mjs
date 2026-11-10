@@ -40,7 +40,7 @@ describe('DSH bundle manifest', () => {
     assert.deepEqual(pkg.dsh.bundle, { patch: './cordis.patch.yml' })
     assert.equal(pkg.dsh.client.platform, 'web')
     assert.equal(pkg.repository.url, 'git+https://github.com/HaowenCang/dsh-study-mode.git')
-    assert.equal(pkg.version, '0.2.2')
+    assert.equal(pkg.version, '0.3.0')
     assert.match(readFileSync(join(root, 'LICENSE'), 'utf8'), /^MIT License/)
   })
 
@@ -73,6 +73,11 @@ describe('DSH bundle manifest', () => {
     // The row id stays dsh-study-mode so existing profile overrides of that row keep applying after the npm rename.
     assert.match(patch, /^    - id: dsh-study-mode$/m)
     assert.doesNotMatch(patch, /dsh-study-core|dsh-rich-response/)
+  })
+
+  it('lets Rich Response decide inline figures per DSH version (inline: auto)', () => {
+    // 0.3.0: auto draws figure fences in the reply on DSH 0.2.2+ and keeps the figure-file route on 0.2.1.
+    assert.match(patch, /^          inline: auto$/m)
   })
 })
 

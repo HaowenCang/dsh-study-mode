@@ -20,10 +20,10 @@ import {
 import type { ToolResultBlock, ToolViewProps } from './contract'
 import { axisTitleText, clamp, niceTicks, normalizeChartWidth } from './renderers/chart/scale'
 import { useContainerWidth } from './renderers/chart/use-width'
-import { PHYSICS_SVG_THEME } from './physics-export'
+import { literalSvgColors, PHYSICS_LIVE_THEME } from './physics-export'
 import { buttonStyle, cardStyle, DSW, noteStyle } from './dsw'
 
-const theme = PHYSICS_SVG_THEME
+const theme = PHYSICS_LIVE_THEME
 const MARGIN = { top: 30, right: 92, bottom: 44, left: 60 } as const
 const LEGEND_WIDTH = 14
 const LEGEND_STEPS = 32
@@ -125,7 +125,7 @@ export function HeatmapView({ content, width }: HeatmapViewProps): ReactElement 
       style={{ display: 'block', maxWidth: '100%', height: 'auto' }}
       fontFamily={FONT}
     >
-      <rect x={0} y={0} width={totalWidth} height={px(totalHeight)} fill="#ffffff" />
+      <rect x={0} y={0} width={totalWidth} height={px(totalHeight)} fill={theme.background} />
       <text x={MARGIN.left} y={18} fontSize={13} fontWeight={600} fill={theme.text}>{content.title}</text>
       <g data-dsh-rich="heatmap-cells" shapeRendering="crispEdges">
         {content.values.map((row, r) => row.map((value, c) => {
@@ -193,7 +193,7 @@ export function HeatmapView({ content, width }: HeatmapViewProps): ReactElement 
 }
 
 /** Responsive heatmap that follows its container width. */
-function Heatmap({ content }: { readonly content: HeatmapContent }): ReactElement {
+export function Heatmap({ content }: { readonly content: HeatmapContent }): ReactElement {
   const { ref, width } = useContainerWidth()
   return (
     <div ref={ref} data-dsh-rich-container="heatmap" style={{ width: '100%', minWidth: 0 }}>
@@ -212,7 +212,7 @@ function HeatmapCard({ content }: { readonly content: HeatmapContent }): ReactEl
       return
     }
     try {
-      const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)], { type: 'image/svg+xml;charset=utf-8' }))
+      const url = URL.createObjectURL(new Blob([literalSvgColors(new XMLSerializer().serializeToString(svg))], { type: 'image/svg+xml;charset=utf-8' }))
       const link = document.createElement('a')
       link.href = url
       link.download = 'heatmap.svg'

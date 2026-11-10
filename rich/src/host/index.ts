@@ -19,13 +19,26 @@ import { createMermaidTool } from './tools/rich-mermaid'
 import { createHeatmapTool } from './tools/rich-heatmap'
 import { createImageTool, type ImageToolServices } from './tools/rich-image'
 import { createSvgTool } from './tools/rich-svg'
+import { createCheckFigureTool } from './tools/rich-check-figure'
 import { createFigureStore, defaultFiguresDir } from './figures'
+import type { FigureStore } from './figures'
 import type { HostConfig, HostContext } from './types'
 
 export const name = 'dsh-rich-response'
 
 /** Cordis services this plugin needs before `apply` runs. */
 export const inject = ['tools', 'commands']
+
+/**
+ * Whether answers draw figures inline. `auto` follows the Host: DSH 0.2.2 added `tools.setExecutor`
+ * in the same release whose client this plugin shadows, so its presence marks a Host where inline
+ * fences render (0.2.1 lacks it and keeps the figure-file route).
+ */
+export function inlineActive(tools: { readonly setExecutor?: unknown }, mode: HostConfig['inline']): boolean {
+  if (mode === 'on') return true
+  if (mode === 'off') return false
+  return typeof tools.setExecutor === 'function'
+}
 
 /** Register both Host contributions under one effect-owned lifetime. */
 export function apply(ctx: HostContext, config?: HostConfig): void {
@@ -35,13 +48,16 @@ export function apply(ctx: HostContext, config?: HostConfig): void {
     : undefined
 
   const figuresDir = typeof config?.figuresDir === 'string' && config.figuresDir.length > 0 ? config.figuresDir : defaultFiguresDir()
-  const figures = createFigureStore(figuresDir)
+  const inline = inlineActive(ctx.tools, config?.inline)
+  // Inline answers draw fences: no figure file, no image line, no copy-the-line note.
+  const figures: FigureStore | undefined = inline ? undefined : createFigureStore(figuresDir)
 
   ctx.effect(() => ctx.tools.register(createRichRenderTool({ figures })))
   ctx.effect(() => ctx.tools.register(createPhysicsTool()))
   ctx.effect(() => ctx.tools.register(createMermaidTool({ figures })))
   ctx.effect(() => ctx.tools.register(createHeatmapTool({ figures })))
   ctx.effect(() => ctx.tools.register(createSvgTool({ figures })))
+  if (inline) ctx.effect(() => ctx.tools.register(createCheckFigureTool()))
   const imageTool = createImageTool({
     services: () => ({
       fs: ctx.get?.('fs') as ImageToolServices['fs'],
@@ -58,9 +74,11 @@ export function apply(ctx: HostContext, config?: HostConfig): void {
   })))
 
   ctx.logger.info(
-    'rich-response: host half registered (rich_render, rich_physics_demo, rich_mermaid, rich_heatmap, rich_image, rich_svg tools, rich-interaction command, auditLog=%s, figuresDir=%s)',
+    'rich-response: host half registered (rich_render, rich_physics_demo, rich_mermaid, rich_heatmap, rich_image, rich_svg%s tools, rich-interaction command, inline=%s, auditLog=%s, figuresDir=%s)',
+    inline ? ', rich_check_figure' : '',
+    inline ? 'on' : 'off',
     auditLog ?? '<none>',
-    figuresDir,
+    inline ? '<unused>' : figuresDir,
   )
 }
 

@@ -34,6 +34,24 @@ export type SanitizeResult =
 interface Element { readonly name: string; readonly attrs: Map<string, string>; readonly children: Node[] }
 type Node = Element | { readonly text: string }
 
+/** One rebuilt element: allowlisted name, validated attributes in source order, rebuilt children. */
+export interface SvgTreeElement { readonly name: string; readonly attrs: ReadonlyMap<string, string>; readonly children: readonly SvgTreeNode[] }
+/** A rebuilt node; text is raw (unescaped) and only appears inside text, tspan, title and desc. */
+export type SvgTreeNode = SvgTreeElement | { readonly text: string }
+
+/** Validated drawing as a tree; `currentColor` is kept so an inline renderer can follow the page theme. */
+export type SanitizeTreeResult =
+  | { readonly ok: true; readonly viewBox: [number, number, number, number]; readonly children: readonly SvgTreeElement[]; readonly rootPaint: ReadonlyMap<string, string>; readonly elements: number }
+  | { readonly ok: false; readonly issues: readonly string[] }
+
+export interface SanitizeTreeOptions {
+  /**
+   * Streaming mode: a trailing incomplete tag or comment is dropped and open elements are closed
+   * instead of refused. Everything that is present must still pass the allowlist.
+   */
+  readonly partial?: boolean
+}
+
 // Every pattern is unambiguous (no two quantifiers can match the same character), so matching
 // stays linear on hostile input; whitespace is the XML set only, never JS `\s`.
 const NUMBER = /^[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?(?:px)?$/
@@ -54,6 +72,8 @@ const ID = /^[A-Za-z][\w-]{0,63}$/
 const MARKER_REF = /^url\(#([A-Za-z][\w-]{0,63})\)$/
 
 type Check = (value: string) => boolean
+/** Own-property lookup: names such as `constructor` or `__proto__` must never resolve through Object.prototype. */
+const own = <T>(table: Readonly<Record<string, T>>, key: string): T | undefined => Object.hasOwn(table, key) ? table[key] : undefined
 const finite = (value: string): boolean => Number.isFinite(Number.parseFloat(value)) && Math.abs(Number.parseFloat(value)) <= SVG_LIMITS.maxAbsNumber
 const number: Check = v => v.length <= MAX_SCALAR && NUMBER.test(v.trim()) && finite(v)
 const length: Check = v => v.length <= MAX_SCALAR && LENGTH.test(v.trim()) && finite(v)
@@ -107,14 +127,15 @@ function decode(text: string, issues: string[]): string {
       if (code <= 0x10ffff && XML_CHARS.test(String.fromCodePoint(code))) return String.fromCodePoint(code)
     }
     const named: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" }
-    if (named[entity] !== undefined && all.endsWith(';')) return named[entity]
+    const value = own(named, entity)
+    if (value !== undefined && all.endsWith(';')) return value
     issues.push(`entity "${all.slice(0, 12)}" is not allowed`)
     return ''
   })
 }
 
 /** Parse the source into one root element; structural problems become issues. */
-function parse(source: string, issues: string[]): Element | undefined {
+function parse(source: string, issues: string[], partial = false): Element | undefined {
   let index = 0
   const stack: Element[] = []
   let root: Element | undefined
@@ -147,6 +168,8 @@ function parse(source: string, issues: string[]): Element | undefined {
       const selfClosing = source.startsWith('/>', index)
       index += selfClosing ? 2 : 1
       const parent = stack.at(-1)
+      // Refuse depth while parsing: later passes recurse over the tree and must stay bounded.
+      if (stack.length > SVG_LIMITS.maxDepth) { issues.push(`nesting deeper than ${String(SVG_LIMITS.maxDepth)}`); break }
       if (parent === undefined) {
         if (root !== undefined) { issues.push('more than one root element'); break }
         root = element
@@ -163,25 +186,39 @@ function parse(source: string, issues: string[]): Element | undefined {
     if (parent === undefined) { issues.push('text outside the root element'); break }
     parent.children.push({ text: decode(raw, issues) })
   }
-  if (issues.length === 0 && stack.length > 0) issues.push(`unclosed <${stack.at(-1)?.name ?? ''}>`)
+  if (issues.length === 0 && stack.length > 0 && !partial) issues.push(`unclosed <${stack.at(-1)?.name ?? ''}>`)
   if (issues.length === 0 && root === undefined) issues.push('no <svg> root element')
   return issues.length === 0 ? root : undefined
 }
 
-function attributeString(attrs: Map<string, string>): string {
+function attributeString(attrs: ReadonlyMap<string, string>): string {
   return [...attrs].map(([name, value]) => ` ${name}="${escapeXml(value.trim().replace(/^currentColor$/, FIGURE_THEME.text))}"`).join('')
 }
 
+/** Drop a trailing incomplete tag or comment from a streaming prefix. */
+function completePrefix(source: string): string {
+  let text = source
+  const comment = text.lastIndexOf('<!--')
+  if (comment >= 0 && text.indexOf('-->', comment + 4) < 0) text = text.slice(0, comment)
+  const lt = text.lastIndexOf('<')
+  if (lt >= 0 && text.indexOf('>', lt) < 0) text = text.slice(0, lt)
+  return text
+}
+
 /**
- * Validate and rebuild a model-written SVG drawing.
- * @param source - complete SVG text with a `viewBox` on its root.
+ * Validate a model-written SVG drawing and rebuild it as an allowlisted tree.
+ * @param source - SVG text with a `viewBox` on its root (a streaming prefix when `partial`).
+ * @param options - `partial` for streaming prefixes.
  */
-export function sanitizeSvg(source: string): SanitizeResult {
+export function sanitizeSvgTree(source: string, options: SanitizeTreeOptions = {}): SanitizeTreeResult {
+  const partial = options.partial === true
   const issues: string[] = []
   if (typeof source !== 'string' || source.length === 0) return { ok: false, issues: ['svg must be a non-empty string'] }
   if (source.length > SVG_LIMITS.maxSourceChars) return { ok: false, issues: [`svg exceeds ${String(SVG_LIMITS.maxSourceChars)} characters`] }
   if (!xmlText(source)) return { ok: false, issues: ['svg contains characters that XML does not allow (control characters, U+FFFE/U+FFFF or unpaired surrogates)'] }
-  const root = parse(source.trim(), issues)
+  const text = partial ? completePrefix(source.trim()) : source.trim()
+  if (text.length === 0) return { ok: false, issues: ['svg is not complete yet'] }
+  const root = parse(text, issues, partial)
   if (root === undefined) return { ok: false, issues }
   if (root.name !== 'svg') return { ok: false, issues: [`root must be <svg>, not <${root.name}>`] }
   const parts = (root.attrs.get('viewBox') ?? '').trim().split(/[ \t\n\r,]+/)
@@ -201,38 +238,60 @@ export function sanitizeSvg(source: string): SanitizeResult {
   const rootPaint = new Map<string, string>()
   for (const [name, value] of root.attrs) {
     if (name === 'viewBox' || ROOT_IGNORED.has(name) || name.startsWith('xmlns:')) continue
-    const check = PAINT[name] ?? FONT[name]
+    const check = own(PAINT, name) ?? own(FONT, name)
     if (check === undefined) issues.push(`<svg> attribute "${name}" is not allowed`)
     else if (!check(value)) issues.push(`<svg> attribute "${name}" has an invalid value`)
     else rootPaint.set(name, value)
   }
-  const build = (element: Element, depth: number, parentName: string): string => {
+  const build = (element: Element, depth: number, parentName: string): SvgTreeElement | undefined => {
     elements += 1
-    if (depth > SVG_LIMITS.maxDepth) { issues.push(`nesting deeper than ${String(SVG_LIMITS.maxDepth)}`); return '' }
-    const allowed = ELEMENTS[element.name]
-    if (allowed === undefined || (element.name === 'tspan' && parentName !== 'text' && parentName !== 'tspan')) { issues.push(`<${element.name}> is not allowed`); return '' }
+    if (depth > SVG_LIMITS.maxDepth) { issues.push(`nesting deeper than ${String(SVG_LIMITS.maxDepth)}`); return undefined }
+    const allowed = own(ELEMENTS, element.name)
+    if (allowed === undefined || (element.name === 'tspan' && parentName !== 'text' && parentName !== 'tspan')) { issues.push(`<${element.name}> is not allowed`); return undefined }
     const attrs = new Map<string, string>()
     for (const [name, value] of element.attrs) {
-      const check = allowed[name] ?? (element.name === 'marker' || element.name === 'defs' ? undefined : PAINT[name])
+      const check = own(allowed, name) ?? (element.name === 'marker' || element.name === 'defs' ? undefined : own(PAINT, name))
         ?? (MARKABLE.has(element.name) && MARKERS.includes(name) ? markerRef(markerIds) : undefined)
       if (check === undefined) { issues.push(`<${element.name}> attribute "${name}" is not allowed`); continue }
       if (!check(value)) { issues.push(`<${element.name}> attribute "${name}" has an invalid value${MARKERS.includes(name) ? ' (use url(#id) of a defined marker)' : ''}`); continue }
       attrs.set(name, value)
     }
-    let body = ''
+    const children: SvgTreeNode[] = []
     for (const child of element.children) {
-      if ('name' in child) { body += build(child, depth + 1, element.name); continue }
+      if ('name' in child) { const built = build(child, depth + 1, element.name); if (built !== undefined) children.push(built); continue }
       if (!TEXT_PARENTS.has(element.name)) { issues.push(`text is not allowed inside <${element.name}>`); continue }
       textChars += child.text.length
-      body += escapeXml(child.text)
+      children.push({ text: child.text })
     }
-    return `<${element.name}${attributeString(attrs)}${body.length > 0 ? `>${body}</${element.name}>` : '/>'}`
+    return { name: element.name, attrs, children }
   }
-  const inner = root.children.map(child => 'name' in child ? build(child, 1, 'svg') : (issues.push('text is not allowed inside <svg>'), '')).join('')
+  const children: SvgTreeElement[] = []
+  for (const child of root.children) {
+    if (!('name' in child)) { issues.push('text is not allowed inside <svg>'); continue }
+    const built = build(child, 1, 'svg')
+    if (built !== undefined) children.push(built)
+  }
   if (elements > SVG_LIMITS.maxElements) issues.push(`more than ${String(SVG_LIMITS.maxElements)} elements`)
   if (textChars > SVG_LIMITS.maxTextChars) issues.push(`more than ${String(SVG_LIMITS.maxTextChars)} text characters`)
   if (issues.length > 0) return { ok: false, issues: [...new Set(issues)].slice(0, 8) }
-  return { ok: true, viewBox: viewBox as [number, number, number, number], inner, rootPaint: attributeString(rootPaint), elements }
+  return { ok: true, viewBox: viewBox as [number, number, number, number], children, rootPaint, elements }
+}
+
+function serialize(node: SvgTreeNode): string {
+  if (!('name' in node)) return escapeXml(node.text)
+  const body = node.children.map(serialize).join('')
+  return `<${node.name}${attributeString(node.attrs)}${body.length > 0 ? `>${body}</${node.name}>` : '/>'}`
+}
+
+/**
+ * Validate and rebuild a model-written SVG drawing as a string for figure files and cards
+ * (`currentColor` is pinned to the light figure theme there).
+ * @param source - complete SVG text with a `viewBox` on its root.
+ */
+export function sanitizeSvg(source: string): SanitizeResult {
+  const tree = sanitizeSvgTree(source)
+  if (!tree.ok) return tree
+  return { ok: true, viewBox: tree.viewBox, inner: tree.children.map(serialize).join(''), rootPaint: attributeString(tree.rootPaint), elements: tree.elements }
 }
 
 /** Longest figure card the client will show (the card adds a frame to a source of at most 64K characters). */

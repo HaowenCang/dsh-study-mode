@@ -6,9 +6,9 @@ import type {RendererTheme} from './renderers/types'
 import type {ToolViewProps} from './contract'
 import type {PlotSeries} from '../shared/protocol'
 import {buttonStyle,cardStyle,noteStyle} from './dsw'
-import {copyPhysicsData,createPhysicsSvgExport,enterPhysicsFullscreen,PHYSICS_SVG_THEME,physicsSvgDetails,type PhysicsPreferences} from './physics-export'
+import {copyPhysicsData,createPhysicsSvgExport,enterPhysicsFullscreen,literalSvgColors,PHYSICS_LIVE_THEME,physicsSvgDetails,type PhysicsPreferences} from './physics-export'
 
-const theme:RendererTheme=PHYSICS_SVG_THEME
+const theme:RendererTheme=PHYSICS_LIVE_THEME
 type Preferences=PhysicsPreferences
 const defaults:Preferences={n:1,mass:1,spring:4,amplitude:1,phase:0,quantity:'position',density:false,size:16,kind:'ordered',seed:1}
 function readPreferences(key:string):Preferences{
@@ -25,7 +25,7 @@ function readPreferences(key:string):Preferences{
 function graph(title:string,series:PlotSeries[],xLabel:string,xUnit:string,yLabel:string,yUnit:string){
   return <LinePlot theme={theme} content={{schemaVersion:1,type:'line_plot',title,data:{series,xAxis:{label:xLabel,unit:xUnit},yAxis:{label:yLabel,unit:yUnit}}}}/>
 }
-function PhysicsDemoCard({demo,storageKey}:{demo:PhysicsDemo;storageKey:string}){
+export function PhysicsDemoCard({demo,storageKey}:{demo:PhysicsDemo;storageKey:string}){
   const [p,setPreferences]=useState(()=>readPreferences(storageKey)),[notice,setNotice]=useState('')
   const root=useRef<HTMLElement>(null)
   useEffect(()=>{try{window.localStorage.setItem(storageKey,JSON.stringify({version:1,value:p}))}catch{/* Local presentation preferences are best effort, never learning evidence. */}},[storageKey,p])
@@ -39,7 +39,7 @@ function PhysicsDemoCard({demo,storageKey}:{demo:PhysicsDemo;storageKey:string})
     if(!svg){setNotice('图形尚未准备好。');return}
     try{
       const copy=createPhysicsSvgExport(svg,physicsSvgDetails(demo,p))
-      const url=URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(copy)],{type:'image/svg+xml;charset=utf-8'}))
+      const url=URL.createObjectURL(new Blob([literalSvgColors(new XMLSerializer().serializeToString(copy))],{type:'image/svg+xml;charset=utf-8'}))
       const link=document.createElement('a');link.href=url;link.download=demo+'.svg';link.click();setTimeout(()=>URL.revokeObjectURL(url),0)
       setNotice('已导出当前 SVG。')
     }catch{setNotice('当前浏览器无法导出 SVG。')}
